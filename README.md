@@ -8,6 +8,6 @@ See [INSTALL.md](INSTALL.md).
 
 ## Usage
 
-- Use `bwu` to unlock the vault, setting the env variable $BW_SESSION
-- Use `bwusr [ITEM]` to get a username.
-- Use `bwpwd [ITEM]` to get a password.
+- Use `bwunlk` to unlock the vault, setting the env variable $BW_SESSION
+- Use `bwuser [ITEM]` to get a username.
+- Use `bwpass [ITEM]` to get a password.

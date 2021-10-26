@@ -70,6 +70,6 @@ function bw-user() {
     fi
     echo $username | clipcopy
 }
-alias bwu='bw-unlock'
-alias bwpwd='bwu && bw-password'
-alias bwusr='bwu && bw-user'
+alias bwunlk='bw-unlock'
+alias bwpass='bwu && bw-password'
+alias bwuser='bwu && bw-user'
