@@ -21,7 +21,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-function bw-search() {
+function bw-password() {
+    if [ $# -eq 1 ]; then
+        if password=$(bw get password $1 2> /dev/null); then
+            echo $password
+            return 0
+        fi
+    fi
     if [ -n "$1" ]; then
         if ! searchout=$(bw list items --search "$1"); then
             echo "$1 not found"
@@ -56,16 +62,6 @@ function bw-unlock() {
 
     fi
 }
-function bw-password() {
-    if [ $# -eq 2 ]; then
-        bw-search $1 $2
-    else
-        if ! password=$(bw get password $1 2> /dev/null); then
-            password=$(bw-search $1)
-        fi
-        echo $password
-    fi
-}
 function bw-user() {
     if ! username=$(bw get username $1 2> /dev/null); then
         select username in $(bw list items --search $1 | jq -r ".[].login.username")
@@ -76,6 +72,5 @@ function bw-user() {
     echo $username
 }
 alias bwu='bw-unlock'
-alias bws='bwu && bw-search'
 alias bwpwd='bwu && bw-password'
 alias bwusr='bwu && bw-user'
