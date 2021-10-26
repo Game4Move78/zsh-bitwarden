@@ -22,7 +22,7 @@
 # SOFTWARE.
 
 function bw-search() {
-	  if [ -n "$1" ]; then
+    if [ -n "$1" ]; then
         if ! searchout=$(bw list items --search "$1"); then
             echo "$1 not found"
             echo "$1"
