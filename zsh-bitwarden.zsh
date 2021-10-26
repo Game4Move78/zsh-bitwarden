@@ -24,14 +24,13 @@
 function bw-password() {
     if [ $# -eq 1 ]; then
         if password=$(bw get password $1 2> /dev/null); then
-            echo $password
+            echo $password | clipcopy
             return 0
         fi
     fi
     if [ -n "$1" ]; then
         if ! searchout=$(bw list items --search "$1"); then
             echo "$1 not found"
-            echo "$1"
             return 3
         fi
         if [ -n "$2" ]; then
@@ -42,7 +41,7 @@ function bw-password() {
 	              break;
             done
         fi
-		    if ! echo "$searchout" | jq -re ".[].login | select(.username == \"$username\") | .password"; then
+		    if ! echo "$searchout" | jq -re ".[].login | select(.username == \"$username\") | .password" | clipcopy; then
 			      echo "Username $2 not found. Choices:"
 			      echo "$searchout" | jq -r ".[].login.username"
 			      return 2
@@ -69,8 +68,8 @@ function bw-user() {
 	          break;
         done
     fi
-    echo $username
+    echo $username | clipcopy
 }
 alias bwu='bw-unlock'
-alias bwpwd='bwu && bw-password | clipcopy'
-alias bwusr='bwu && bw-user | clipcopy'
+alias bwpwd='bwu && bw-password'
+alias bwusr='bwu && bw-user'
