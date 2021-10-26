@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-function bw-password() {
+function bw-pass() {
     if [ $# -eq 1 ]; then
         if password=$(bw get password $1 2> /dev/null); then
             echo $password | clipcopy
@@ -51,7 +51,7 @@ function bw-password() {
 		    return 1
 	  fi
 }
-function bw-unlock() {
+function bw-unlk() {
 	  if [ -z "$BW_SESSION" ]; then
         if BW_SESSION=$(bw unlock --raw); then
 		        export BW_SESSION="$BW_SESSION"
@@ -70,6 +70,9 @@ function bw-user() {
     fi
     echo $username | clipcopy
 }
-alias bwunlk='bw-unlock'
-alias bwpass='bw-unlock && bw-password'
-alias bwuser='bw-unlock && bw-user'
+# Think v(ault) u(n)l(oc)k
+alias vulk='bw-unlk'
+# Think v(ault) p(ass)w(or)d
+alias vpwd='bw-unlk && bw-pass'
+# Think v(ault) us(e)r(name)
+alias vusr='bw-unlk && bw-user'
