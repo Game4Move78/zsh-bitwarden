@@ -22,8 +22,7 @@
 # SOFTWARE.
 
 function bw-search() {
-	  if [ -n "$1" ]
-	  then
+	  if [ -n "$1" ]; then
         if ! searchout=$(bw list items --search "$1"); then
             echo "$1 not found"
             echo "$1"
@@ -48,8 +47,7 @@ function bw-search() {
 	  fi
 }
 function bw-unlock() {
-	  if [ -z "$BW_SESSION" ]
-	  then
+	  if [ -z "$BW_SESSION" ]; then
         if BW_SESSION=$(bw unlock --raw); then
 		       export BW_SESSION="$BW_SESSION"
         else
