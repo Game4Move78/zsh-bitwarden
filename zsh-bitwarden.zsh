@@ -49,7 +49,7 @@ function bw-search() {
 function bw-unlock() {
 	  if [ -z "$BW_SESSION" ]; then
         if BW_SESSION=$(bw unlock --raw); then
-		       export BW_SESSION="$BW_SESSION"
+		        export BW_SESSION="$BW_SESSION"
         else
             return 1
         fi
