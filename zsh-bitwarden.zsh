@@ -72,5 +72,5 @@ function bw-user() {
     echo $username
 }
 alias bwu='bw-unlock'
-alias bwpwd='bwu && bw-password'
-alias bwusr='bwu && bw-user'
+alias bwpwd='bwu && bw-password | clipcopy'
+alias bwusr='bwu && bw-user | clipcopy'
