@@ -32,7 +32,7 @@ function bw-search() {
         if [ -n "$2" ]; then
             username=$2
         else
-            select username in $(bw list items --search $1 | jq -r ".[].login.username")
+            select username in $(jq -r ".[].login.username" <<< "$searchout")
             do
 	              break;
             done
