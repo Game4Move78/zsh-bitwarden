@@ -21,26 +21,33 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-function fzf-exists() {
-    declare -f -F $1 > /dev/null
-}
-
-function bw-search() {
-    bw list items --search $1 \
-        | jq -r '.[] | [.id, .name, .login.username, .login.password] | @tsv' \
-        | column -t -s $'\t'| fzf --with-nth 2,3 | awk "{print \$$2}"
+function bw-table() {
+    read json
+    keys=$(
+        function() {
+            local IFS=,
+            echo "$*"
+            IFS=tmp
+        } "$@"
+    )
+    echo $keys
+    jq -r ".[] | [$keys] | @tsv" <<< $json | column -t -s $'\t'
 }
 
 function bw-user() {
     if ! username=$(bw get username $1 2> /dev/null); then
-        username=$(bw-search $1 3)
+        username=$(bw list items --search $1 \
+                   | bw-table .name .login.username .login.password \
+                   | fzf --with-nth 1,2 | cut -f2)
     fi
     clipcopy <<< $username
 }
 
 function bw-pass() {
     if ! password=$(bw get password $1 2> /dev/null); then
-        password=$(bw-search $1 4)
+        password=$(bw list items --search $1 \
+                   | bw-table .name .login.username .login.password \
+                   | fzf --with-nth 1,2 | cut -f3)
     fi
     clipcopy <<< $password
 }
