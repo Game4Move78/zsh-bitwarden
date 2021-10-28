@@ -26,10 +26,9 @@ function bw-table() {
     keys=$(
         function() {
             local IFS=,
-            IFS=tmp
+            echo "$*"
         } "$@"
     )
-    echo $keys
     jq -r ".[] | [$keys] | @tsv" <<< $json | column -t -s $'\t'
 }
 
