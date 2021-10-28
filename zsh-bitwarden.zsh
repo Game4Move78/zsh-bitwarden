@@ -23,31 +23,33 @@
 
 function bw-table() {
     read json
-    keys=$(
-        function() {
-            local IFS=,
-            echo "$*"
-        } "$@"
-    )
-    jq -r ".[] | [$keys] | @tsv" <<< $json | column -t -s $'\t'
+    keys=$(IFS=, ; echo "$*")
+    jq -r ".[] | [$keys] | @tsv" <<< $json
+}
+
+function bw-select() {
+    tsv=$(</dev/stdin)
+    tbl=$(nl <<< $tsv | column -t -s $'\t')
+    colarr=()
+    for arg in "$@"
+    do
+        colarr+=($(expr $arg + 1))
+    done
+    cols=$(IFS=, ; echo "${colarr[*]}")
+    row=$(fzf --with-nth $cols --select-1 <<< $tbl | awk '{print $1}')
+    sed -n "${row}p" <<< $tsv
 }
 
 function bw-user() {
-    if ! username=$(bw get username $1 2> /dev/null); then
-        username=$(bw list items --search $1 \
-                   | bw-table .name .login.username .login.password \
-                   | fzf --with-nth 1,2 | cut -f2)
-    fi
-    clipcopy <<< $username
+    bw list items --search $1 \
+        | bw-table .name .login.username .login.password \
+        | bw-select 1 2 | cut -f2 | clipcopy
 }
 
 function bw-pass() {
-    if ! password=$(bw get password $1 2> /dev/null); then
-        password=$(bw list items --search $1 \
-                   | bw-table .name .login.username .login.password \
-                   | fzf --with-nth 1,2 | cut -f3)
-    fi
-    clipcopy <<< $password
+    bw list items --search $1 \
+        | bw-table .name .login.username .login.password \
+        | bw-select 1 2 | cut -f3 | clipcopy
 }
 
 function bw-unlk() {
