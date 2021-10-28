@@ -26,7 +26,6 @@ function bw-table() {
     keys=$(
         function() {
             local IFS=,
-            echo "$*"
             IFS=tmp
         } "$@"
     )
