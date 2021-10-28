@@ -40,16 +40,41 @@ function bw-select() {
     sed -n "${row}p" <<< $tsv
 }
 
+function bw-search() {
+    columns=()
+    visible=()
+    out=()
+    while getopts "c:C:s:o:" o; do
+        case $o in
+            c) # Visible column
+                columns+=($OPTARG)
+                visible+=(${#columns[@]})
+                ;;
+            C) # Hidden column
+                columns+=($OPTARG)
+                ;;
+            s)
+                search=$OPTARG
+                ;;
+            o)
+                out+=($OPTARG)
+                ;;
+        esac
+    done
+    bw list items --search "$search" \
+        | bw-table ${columns[@]} \
+        | bw-select ${visible[@]} \
+        | cut -f$(IFS=, ; echo "${out[*]}")
+}
+
 function bw-user() {
-    bw list items --search $1 \
-        | bw-table .name .login.username .login.password \
-        | bw-select 1 2 | cut -f2 | clipcopy
+    bw-search -c .name -c .login.username -C .login.password \
+              -s $1 -o 2 | clipcopy
 }
 
 function bw-pass() {
-    bw list items --search $1 \
-        | bw-table .name .login.username .login.password \
-        | bw-select 1 2 | cut -f3 | clipcopy
+    bw-search -c .name -c .login.username -C .login.password \
+              -s $1 -o 3 | clipcopy
 }
 
 function bw-unlk() {
