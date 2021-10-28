@@ -70,9 +70,7 @@ function bw-user() {
     fi
     echo $username | clipcopy
 }
-# Think v(ault) u(n)l(oc)k
-alias vulk='bw-unlk'
-# Think v(ault) p(ass)w(or)d
-alias vpwd='bw-unlk && bw-pass'
-# Think v(ault) us(e)r(name)
-alias vusr='bw-unlk && bw-user'
+
+alias bwulk='bw-unlk'
+alias bwpwd='bw-unlk && bw-pass'
+alias bwusr='bw-unlk && bw-user'
