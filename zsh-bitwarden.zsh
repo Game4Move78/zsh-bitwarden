@@ -21,54 +21,40 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-function bw-pass() {
-    if [ $# -eq 1 ]; then
-        if password=$(bw get password $1 2> /dev/null); then
-            echo $password | clipcopy
-            return 0
-        fi
-    fi
-    if [ -n "$1" ]; then
-        if ! searchout=$(bw list items --search "$1"); then
-            echo "$1 not found"
-            return 3
-        fi
-        if [ -n "$2" ]; then
-            username=$2
-        else
-            select username in $(jq -r ".[].login.username" <<< "$searchout")
-            do
-	              break;
-            done
-        fi
-		    if ! echo "$searchout" | jq -re ".[].login | select(.username == \"$username\") | .password" | clipcopy; then
-			      echo "Username $2 not found. Choices:"
-			      echo "$searchout" | jq -r ".[].login.username"
-			      return 2
-		    fi
-	  else
-		    echo "Usage: bw-search [key] [value]" 
-		    return 1
-	  fi
+function fzf-exists() {
+    declare -f -F $1 > /dev/null
 }
+
+function bw-search() {
+    bw list items --search $1 \
+        | jq -r '.[] | [.id, .name, .login.username, .login.password] | @tsv' \
+        | column -t -s $'\t'| fzf --with-nth 2,3 | awk "{print \$$2}"
+}
+
+function bw-user() {
+    if ! username=$(bw get username $1 2> /dev/null); then
+        username=$(bw-search $1 3)
+    fi
+    clipcopy <<< $username
+}
+
+function bw-pass() {
+    if ! password=$(bw get password $1 2> /dev/null); then
+        password=$(bw-search $1 4)
+    fi
+    clipcopy <<< $password
+}
+
 function bw-unlk() {
 	  if [ -z "$BW_SESSION" ]; then
         if BW_SESSION=$(bw unlock --raw); then
 		        export BW_SESSION="$BW_SESSION"
         else
+            unset BW_SESSION
             return 1
         fi
 
     fi
-}
-function bw-user() {
-    if ! username=$(bw get username $1 2> /dev/null); then
-        select username in $(bw list items --search $1 | jq -r ".[].login.username")
-        do
-	          break;
-        done
-    fi
-    echo $username | clipcopy
 }
 
 alias bwulk='bw-unlk'
