@@ -26,6 +26,19 @@ for entering fields.
 `-o` and `-O` determine the columns that are displayed in and returned by `fzf`.
 `-o` and `-O` are output columns, but only `-o` will appear in the `fzf` finder
 while `-O` will be hidden, but returned in stdout. `c` is not returned in stdout
-and is used to identify items in `fzf`.
+and is simply displayed in the `fzf` finder.
 
-
+If you wanted `bwpw` to display the item ids as well as the names you could
+change the alias from
+```
+alias bwpw='bwse  -c .name -c .login.username -O .login.password -c .notes -s '
+```
+to
+```
+alias bwpw='bwse -c .id -c .name -c .login.username -O .login.password -c .notes -s '
+```
+Or to output the id as well as the password you could use
+```
+alias bwpw='bwse -o .id -c .name -c .login.username -O .login.password -c .notes -s '
+```
+This will return the item id and password in tab-separated values format.
