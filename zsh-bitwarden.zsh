@@ -62,7 +62,7 @@ _bw_select() {
     colarr+=($(expr $arg + 1))
   done
   local cols=$(IFS=, ; echo "${colarr[*]}")
-  local row=$(fzf --with-nth $cols --select-1 --header-lines=1 <<< $tbl
+  local row=$(fzf --with-nth $cols --select-1 --header-lines=1 <<< $tbl\
     | awk '{print $1}')
   if [[ "$?" -ne 0 ]]; then
     echo "Couldn't return value from fzf. Is the header line missing?"
