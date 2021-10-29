@@ -62,7 +62,8 @@ _bw_select() {
     colarr+=($(expr $arg + 1))
   done
   local cols=$(IFS=, ; echo "${colarr[*]}")
-  local row=$(fzf --with-nth $cols --select-1 --header-lines=1 <<< $tbl | awk '{print $1}')
+  local row=$(fzf --with-nth $cols --select-1 --header-lines=1 <<< $tbl
+    | awk '{print $1}')
   if [[ "$?" -ne 0 ]]; then
     echo "Couldn't return value from fzf. Is the header line missing?"
     return 2
@@ -80,15 +81,18 @@ bw_search() {
     case $o in
       h) # Help message
         echo "Usage: $0 [options]"
+        echo "Construct tsv of bitwarden search items results and select with"\
+             "fzf if multiple\nare found."
         echo
-        echo "-c [PATH]  Visible column holding value jq -r [PATH]"
-        echo "-o [PATH]  Visible column holding value jq -r [PATH] which is also in output"
-        echo "-O [PATH]  Invisible column holding value jq -r [PATH] which is in output"
+        echo "-c [PATH]  Visible column holding value at [PATH]"
+        echo "-o [PATH]  Visible column holding value at [PATH]"
+        echo "-O [PATH]  Invisible column holding value at [PATH]"
         echo "-s [ID]    Search string passed to bw --search [ID]"
         echo "-h         Display this help and exit"
         echo
         echo "Examples:"
-        echo "  \$ $0 -c .name -c .login.username -O .login.password -c .notes -s github | clipcopy"
+        echo "  \$ $0 -c .name -c .login.username -O .login.password -c .notes"\
+             "-s github\\ \n      | clipcopy"
         echo "  \$ $0 -c .name -o .login.username | clipcopy"
         return 0
         ;;
