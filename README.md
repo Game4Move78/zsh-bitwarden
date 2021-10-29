@@ -25,7 +25,7 @@ for entering fields.
 `bwus` expands to `bwse -c .name -o .login.username -c .notes -s `. Here `-c`,
 `-o` and `-O` determine the columns that are displayed in and returned by `fzf`.
 `-o` and `-O` are output columns, but only `-o` will appear in the `fzf` finder
-while `-O` will be hidden, but returned in stdout. `c` is not returend in stdout
+while `-O` will be hidden, but returned in stdout. `c` is not returned in stdout
 and is used to identify items in `fzf`.
 
 
