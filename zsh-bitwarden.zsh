@@ -24,7 +24,7 @@
 # Takes JSON as stdin and jq paths to extract into tsv as args
 _bw_table() {
   if [[ "$#" -eq 0 ]]; then
-    echo "usage: $0 path1 path2..."
+    echo "Usage: $0 [PATH]..."
     return 1
   fi
   local json=$(</dev/stdin)
@@ -49,7 +49,7 @@ _bw_table() {
 # Takes tsv as stdin and columns to show in fzf as args
 _bw_select() {
   if [[ "$#" -eq 0 ]]; then
-    echo "usage: $0 n_column1 n_column2..."
+    echo "Usage: $0 [COLUMN INDEX]..."
     return 1
   fi
   local tsv=$(</dev/stdin)
@@ -76,8 +76,22 @@ bw_search() {
   local visible=()
   local out=()
   local o search
-  while getopts "c:C:so:O:" o; do
+  while getopts "c:C:so:O:h" o; do
     case $o in
+      h) # Help message
+        echo "Usage: $0 [options]"
+        echo
+        echo "-c [PATH]  Visible column holding value jq -r [PATH]"
+        echo "-o [PATH]  Visible column holding value jq -r [PATH] which is also in output"
+        echo "-O [PATH]  Invisible column holding value jq -r [PATH] which is in output"
+        echo "-s [ID]    Search string passed to bw --search [ID]"
+        echo "-h         Display this help and exit"
+        echo
+        echo "Examples:"
+        echo "  \$ $0 -c .name -c .login.username -O .login.password -c .notes -s github | clipcopy"
+        echo "  \$ $0 -c .name -o .login.username | clipcopy"
+        return 0
+        ;;
       c) # Visible column
         columns+=($OPTARG)
         visible+=(${#columns[@]})
