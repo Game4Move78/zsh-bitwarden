@@ -17,10 +17,10 @@ See [INSTALL.md](INSTALL.md).
 
 `bwus` and `bwpw` are both aliases for more verbose commands using `bwse`.
 `bwse` is a more powerful command which can be used to search over all items
-letting the user select from choices using `fzf`. Each item has a set of columns
-some of which are set to be visible in `fzf`, and some of these columns can be
-returned on output. If a single column is returned it can be piped to `clipcopy`
-for entering fields.
+letting the user select from choices using `fzf`. Each item has a set of fields 
+some of which are set to be visible in `fzf`, and some of these fields can be
+returned on output. If a single field is returned it can be piped to `clipcopy`
+to copy the value to clipboard.
 
 `bwus` expands to `bwse -c .name -o .login.username -c .notes -s `. Here `-c`,
 `-o` and `-O` determine the columns that are displayed in and returned by `fzf`.
