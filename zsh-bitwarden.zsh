@@ -24,7 +24,14 @@
 function bw-table() {
     read json
     keys=$(IFS=, ; echo "$*")
-    jq -r ".[] | [$keys] | @tsv" <<< $json
+    echo -n $1
+    for arg in "${@:2}"
+    do
+        echo -en "\t"
+        echo -n "$arg"
+    done
+    echo
+    jq -r "(.[] | [$keys]) | @tsv" <<< $json
 }
 
 function bw-select() {
@@ -36,7 +43,7 @@ function bw-select() {
         colarr+=($(expr $arg + 1))
     done
     cols=$(IFS=, ; echo "${colarr[*]}")
-    row=$(fzf --with-nth $cols --select-1 <<< $tbl | awk '{print $1}')
+    row=$(fzf --with-nth $cols --select-1 --header-lines=1 <<< $tbl | awk '{print $1}')
     sed -n "${row}p" <<< $tsv
 }
 
@@ -68,12 +75,12 @@ function bw-search() {
 }
 
 function bw-user() {
-    bw-search -c .name -c .login.username -C .login.password \
+    bw-search -c .name -c .login.username -C .login.password -c .notes \
               -s $1 -o 2 | clipcopy
 }
 
 function bw-pass() {
-    bw-search -c .name -c .login.username -C .login.password \
+    bw-search -c .name -c .login.username -C .login.password -c .notes \
               -s $1 -o 3 | clipcopy
 }
 
