@@ -115,9 +115,9 @@ bw_search() {
 }
 
 bw_unlock() {
-	if [ "$(bw status | jq -r '.status')" = "locked" ]; then
+  if [ "$(bw status | jq -r '.status')" = "locked" ]; then
     if BW_SESSION=$(bw unlock --raw); then
-		  export BW_SESSION="$BW_SESSION"
+      export BW_SESSION="$BW_SESSION"
     else
       return 1
     fi
