@@ -9,8 +9,8 @@ See [INSTALL.md](INSTALL.md).
 ## Usage
 
 - Use `bwul` to unlock the vault, setting the env variable $BW_SESSION.
-- Use `bwus [ITEM]` to get a username.
-- Use `bwpw [ITEM]` to get a password.
+- Use `bwus [SEARCH]` to get a username.
+- Use `bwpw [SEARCH]` to get a password.
 - Use `bwse -s [SEARCH] -o [OUTPUT COL] ...` to search
 
 ## Examples
