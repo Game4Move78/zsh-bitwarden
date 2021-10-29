@@ -31,7 +31,7 @@ and is simply displayed in the `fzf` finder.
 If you wanted `bwpw` to display the item ids as well as the names you could
 change the alias from
 ```
-alias bwpw='bwse  -c .name -c .login.username -O .login.password -c .notes -s '
+alias bwpw='bwse -c .name -c .login.username -O .login.password -c .notes -s '
 ```
 to
 ```

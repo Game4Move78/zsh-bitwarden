@@ -92,5 +92,5 @@ function bw-unlock() {
 
 alias bwul='bw-unlock'
 alias bwse='bw-unlock && bw-search'
-alias bwus='bwse  -c .name -o .login.username -c .notes -s '
-alias bwpw='bwse  -c .name -c .login.username -O .login.password -c .notes -s '
+alias bwus='bwse -c .name -o .login.username -c .notes -s '
+alias bwpw='bwse -c .name -c .login.username -O .login.password -c .notes -s '
