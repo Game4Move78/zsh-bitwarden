@@ -79,14 +79,12 @@ function bw-search() {
 }
 
 function bw-unlock() {
-	  if [ -z "$BW_SESSION" ]; then
+	  if [ "$(bw status | jq -r '.status')" = "locked" ]; then
         if BW_SESSION=$(bw unlock --raw); then
 		        export BW_SESSION="$BW_SESSION"
         else
-            unset BW_SESSION
             return 1
         fi
-
     fi
 }
 
