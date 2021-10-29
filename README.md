@@ -41,4 +41,4 @@ Or to output the id as well as the password you could use
 ```
 alias bwpw='bwse -o .id -c .name -c .login.username -O .login.password -c .notes -s '
 ```
-This will return the item id and password in tab-separated values format.
+This will return the item id and password in TSV format.
