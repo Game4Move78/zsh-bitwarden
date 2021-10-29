@@ -77,7 +77,7 @@ bw_search() {
   local visible=()
   local out=()
   local o search
-  while getopts "c:C:so:O:h" o; do
+  while getopts ":c:C:s:o:O:h" o; do
     case $o in
       h) # Help message
         echo "Usage: $0 [options]"
