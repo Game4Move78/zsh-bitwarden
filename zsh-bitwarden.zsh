@@ -47,24 +47,28 @@ function bw-select() {
     sed -n "${row}p" <<< $tsv
 }
 
+# TODO: Make option arguments more safe
 function bw-search() {
     columns=()
     visible=()
     out=()
-    while getopts "c:C:s:o:" o; do
+    while getopts "c:C:s:o:O:" o; do
         case $o in
             c) # Visible column
                 columns+=($OPTARG)
                 visible+=(${#columns[@]})
                 ;;
-            C) # Hidden column
-                columns+=($OPTARG)
-                ;;
-            s)
+            s) # Search string
                 search=$OPTARG
                 ;;
-            o)
-                out+=($OPTARG)
+            o) # Output column
+                columns+=($OPTARG)
+                out+=(${#columns[@]})
+                visible+=(${#columns[@]})
+                ;;
+            O) # Hidden output column
+                columns+=($OPTARG)
+                out+=(${#columns[@]})
                 ;;
         esac
     done
@@ -74,17 +78,7 @@ function bw-search() {
         | cut -f$(IFS=, ; echo "${out[*]}")
 }
 
-function bw-user() {
-    bw-search -c .name -c .login.username -C .login.password -c .notes \
-              -s $1 -o 2 | clipcopy
-}
-
-function bw-pass() {
-    bw-search -c .name -c .login.username -C .login.password -c .notes \
-              -s $1 -o 3 | clipcopy
-}
-
-function bw-unlk() {
+function bw-unlock() {
 	  if [ -z "$BW_SESSION" ]; then
         if BW_SESSION=$(bw unlock --raw); then
 		        export BW_SESSION="$BW_SESSION"
@@ -96,6 +90,7 @@ function bw-unlk() {
     fi
 }
 
-alias bwulk='bw-unlk'
-alias bwpwd='bw-unlk && bw-pass'
-alias bwusr='bw-unlk && bw-user'
+alias bwul='bw-unlock'
+alias bwse='bw-unlock && bw-search'
+alias bwus='bwse  -c .name -o .login.username -c .notes -s '
+alias bwpw='bwse  -c .name -c .login.username -O .login.password -c .notes -s '
