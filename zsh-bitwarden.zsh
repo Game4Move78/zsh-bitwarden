@@ -84,10 +84,10 @@ bw_search() {
         echo "Construct tsv of bitwarden search items results and select with"\
              "fzf if multiple\nare found."
         echo
-        echo "-c [PATH]  Visible column holding value at [PATH]"
-        echo "-o [PATH]  Visible column holding value at [PATH]"
-        echo "-O [PATH]  Invisible column holding value at [PATH]"
-        echo "-s [ID]    Search string passed to bw --search [ID]"
+        echo "-c PATH    Visible column holding value at [PATH]"
+        echo "-o PATH    Visible column holding value at [PATH]"
+        echo "-O PATH    Invisible column holding value at [PATH]"
+        echo "-s ID      Search string passed to bw --search [ID]"
         echo "-h         Display this help and exit"
         echo
         echo "Examples:"
