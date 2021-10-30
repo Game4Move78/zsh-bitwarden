@@ -153,7 +153,7 @@ bw_unlock() {
 }
 
 bw_user_pass() {
-  userpass=$(bw_unlock && bw_search -c coOc -s "$*" .name .login.username .login.password .notes)
+  local userpass=$(bw_unlock && bw_search -c coOc -s "$*" .name .login.username .login.password .notes)
   echo -n "Hit enter to copy username..."
   read _ && cut -f 1 <<< $userpass | clipcopy
   echo -n "Hit enter to copy password..."
