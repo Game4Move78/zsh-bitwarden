@@ -71,7 +71,6 @@ _bw_select() {
   sed -n "${row}p" <<< $tsv
 }
 
-# TODO: Make option arguments more safe
 bw_search() {
   local columns=()
   local visible=()
