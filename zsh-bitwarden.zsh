@@ -141,7 +141,16 @@ bw_unlock() {
   fi
 }
 
+bw_user_pass() {
+    userpass=$(bw_unlock && bw_search -c .name -o .login.username -O .login.password -c .notes -s "$*")
+    echo -n "Hit enter to copy username..."
+    read _ && cut -f 1 <<< $userpass | clipcopy
+    echo -n "Hit enter to copy password..."
+    read _ && cut -f 2 <<< $userpass | clipcopy
+}
+
 alias bwul='bw_unlock'
 alias bwse='bw_unlock && bw_search'
 alias bwus='bwse -c .name -o .login.username -c .notes -s '
 alias bwpw='bwse -c .name -c .login.username -O .login.password -c .notes -s '
+alias bwup='bw_user_pass'
