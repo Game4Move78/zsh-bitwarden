@@ -39,7 +39,7 @@ _bw_table() {
   done
   echo
   # Construct tsv with values selected using args
-  jq -er ".[] | [$keys] | @tsv" <<< $json
+  jq -er ".[] | [$keys] | @tsv" <<< $json 2> -
   if [[ "$?" -ne 0 ]]; then
     echo "Unable to construct array [$keys]"
     return 1
@@ -59,13 +59,13 @@ _bw_select() {
   local arg
   for arg in "$@"
   do
-    colarr+=($(expr $arg + 1))
+    colarr+=$(($arg + 1))
   done
   local cols=$(IFS=, ; echo "${colarr[*]}")
   local row=$(fzf --with-nth $cols --select-1 --header-lines=1 <<< $tbl\
     | awk '{print $1}')
   if [[ "$?" -ne 0 ]]; then
-    echo "Couldn't return value from fzf. Is the header line missing?"
+    echo "Couldn't return value from fzf. Is the header line missing?" >&2
     return 2
   fi
   sed -n "${row}p" <<< $tsv
@@ -75,58 +75,69 @@ bw_search() {
   local columns=()
   local visible=()
   local out=()
-  local o search
-  while getopts ":c:C:s:o:O:h" o; do
+  local o search colopts
+  while getopts ":c:Cs:oOh" o; do
     case $o in
       h) # Help message
-        echo "Usage: $0 [options]"
+        echo "Usage: $0 [options] JQPATHS"
         echo "Construct tsv of bitwarden search items results and select with"\
              "fzf if multiple\nare found."
         echo
-        echo "-c PATH    Visible column holding value at [PATH]"
-        echo "-o PATH    Visible column holding value at [PATH]"
-        echo "-O PATH    Invisible column holding value at [PATH]"
+        echo "-c COLS    Each character of COL specifies option for"\
+             "corresponding column."
         echo "-s ID      Search string passed to bw --search [ID]"
         echo "-h         Display this help and exit"
         echo
         echo "Examples:"
-        echo "  \$ $0 -c .name -c .login.username -O .login.password -c .notes"\
-             "-s github\\ \n      | clipcopy"
-        echo "  \$ $0 -c .name -o .login.username | clipcopy"
+        echo "  \$ $0 -c ccOc -s github .name .login.username .login.password .notes"\
+             "\\ \n      | clipcopy"
+        echo "  \$ $0 -c co -s github .name .login.username | clipcopy"
         return 0
-        ;;
-      c) # Visible column
-        columns+=($OPTARG)
-        visible+=(${#columns[@]})
         ;;
       s) # Search string
         search=$OPTARG
         ;;
-      o) # Output column
-        columns+=($OPTARG)
-        out+=(${#columns[@]})
-        visible+=(${#columns[@]})
+      c) # Column options
+        colopts=$OPTARG
         ;;
-      O) # Hidden output column
-        columns+=($OPTARG)
-        out+=(${#columns[@]})
+    esac
+  done
+  shift $(($OPTIND - 1))
+  # Process remaining args
+  if [ ${#colopts} -lt $# ]; then
+    # Extend $colopts with defaults to have an option for each column
+    local remaining=$(printf 'o%.0s' {${#colopts}..$(($# - 1))})
+    colopts="$colopts$remaining"
+  fi
+  # Process the column options
+  for (( i=1; i<=${#colopts}; i++)); do
+    case "${colopts[i]}" in
+      c)
+        visible+=($i)
+        ;;
+      o)
+        visible+=($i)
+        out+=($i)
+        ;;
+      O)
+        out+=($i)
         ;;
     esac
   done
   if [[ "${#visible}" -eq 0 ]]; then
-    echo "No visible fields entered"
+      echo "No visible fields entered" >&2
     return 1
   fi
   if [[ "${#out}" -eq 0 ]]; then
-    echo "No output fields entered"
+    echo "No output fields entered" >&2
     return 2
   fi
   items=$(bw list items --search "$search")
   if [ $(jq '. | length' <<< $items) -eq 0 ]; then
-    echo "No results. Try '-s .' to search through all items."
+    echo "No results. Try '-s .' to search through all items." >&2
     return 4
   fi
-  _bw_table ${columns[@]} <<< $items \
+  _bw_table $@ <<< $items \
     | _bw_select ${visible[@]} \
     | cut -f$(IFS=, ; echo "${out[*]}")
 }
@@ -142,15 +153,24 @@ bw_unlock() {
 }
 
 bw_user_pass() {
-    userpass=$(bw_unlock && bw_search -c .name -o .login.username -O .login.password -c .notes -s "$*")
-    echo -n "Hit enter to copy username..."
-    read _ && cut -f 1 <<< $userpass | clipcopy
-    echo -n "Hit enter to copy password..."
-    read _ && cut -f 2 <<< $userpass | clipcopy
+  userpass=$(bw_unlock && bw_search -c coOc -s "$*" .name .login.username .login.password .notes)
+  echo -n "Hit enter to copy username..."
+  read _ && cut -f 1 <<< $userpass | clipcopy
+  echo -n "Hit enter to copy password..."
+  read _ && cut -f 2 <<< $userpass | clipcopy
 }
+
+bw_username() {
+  bw_unlock && bw_search -c coc -s "$*" .name .login.username .notes
+}
+
+bw_password() {
+  bw_unlock && bw_search -c ccOc -s "$*" .name .login.username .login.password .notes
+}
+
 
 alias bwul='bw_unlock'
 alias bwse='bw_unlock && bw_search'
-alias bwus='bwse -c .name -o .login.username -c .notes -s '
-alias bwpw='bwse -c .name -c .login.username -O .login.password -c .notes -s '
+alias bwus='bw_username'
+alias bwpw='bw_password'
 alias bwup='bw_user_pass'
