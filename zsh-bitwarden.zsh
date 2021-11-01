@@ -53,16 +53,10 @@ _bw_select() {
     return 1
   fi
   local tsv=$(</dev/stdin)
+  local cols=$(IFS=, ; echo "$@")
   # Printable table with index field
-  local tbl=$(nl <<< $tsv | column -t -s $'\t')
-  local colarr=()
-  local arg
-  for arg in "$@"
-  do
-    colarr+=$(($arg + 1))
-  done
-  local cols=$(IFS=, ; echo "${colarr[*]}")
-  local row=$(fzf --with-nth $cols --select-1 --header-lines=1 <<< $tbl\
+  local tbl=$(echo $tsv | cut -d $'\t' -f "$cols" | column -t -s $'\t' | nl -n rz)
+  local row=$(fzf -d $'\t' --with-nth 2 --select-1 --header-lines=1 <<< $tbl\
     | awk '{print $1}')
   if [[ "$?" -ne 0 ]]; then
     echo "Couldn't return value from fzf. Is the header line missing?" >&2
@@ -167,7 +161,6 @@ bw_username() {
 bw_password() {
   bw_unlock && bw_search -c ccOc -s "$*" .name .login.username .login.password .notes
 }
-
 
 alias bwul='bw_unlock'
 alias bwse='bw_unlock && bw_search'
