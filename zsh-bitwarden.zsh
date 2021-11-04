@@ -168,6 +168,36 @@ bw_password() {
   bw_unlock && bw_search -c ccOc -s "$*" .name .login.username .login.password .notes
 }
 
+# TODO IMPLEMENT
+bw_edit() {
+  echo "Not implemented"
+  return 1
+  local result=$(bw_search $* | tr $'\t' '\n' | nl)
+  local outidxs=()
+  while getopts ":c:Cs:oOh" o; do
+    case $o in
+      c) # Column options
+        colopts=$OPTARG
+        for (( i=1; i<=${#colopts}; i++)); do
+          echo $i "${colopts[i]}"
+          if [ "${colopts[i]}" = "o" ] || [ "${colopts[i]}" = "O" ]; then
+            outidxs+=("$i")
+          fi
+        done
+        ;;
+      *) # Discard
+      ;;
+    esac
+  done
+  shift $(($OPTIND - 1))
+  echo $result
+  local fieldnames=()
+  for idx in "$outidxs"; do
+    fieldnames+=(${@:$idx:1})
+  done
+}
+
+
 alias bwul='bw_unlock'
 alias bwse='bw_unlock && bw_search'
 alias bwus='bw_username'
