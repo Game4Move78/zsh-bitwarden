@@ -195,9 +195,32 @@ bw_edit_item() {
   echo "Field updated"
 }
 
+bw_edit_name() {
+  if ! bw_unlock; then
+    return 1
+  fi
+  bw_search -c Occ -s "$*" .id .name .login.username | bw_edit_item -f .name
+}
+
+bw_edit_username() {
+  if ! bw_unlock; then
+    return 1
+  fi
+  bw_search -c Occ -s "$*" .id .name .login.username | bw_edit_item -f .login.username
+}
+
+bw_edit_password() {
+  if ! bw_unlock; then
+    return 1
+  fi
+  bw_search -c Occ -s "$*" .id .name .login.username | bw_edit_item -s -hf .login.password
+}
 
 alias bwul='bw_unlock'
 alias bwse='bw_unlock && bw_search'
 alias bwus='bw_username'
 alias bwpw='bw_password'
 alias bwup='bw_user_pass'
+alias bwen='bw_edit_name'
+alias bweu='bw_edit_username'
+alias bwep='bw_edit_password'
