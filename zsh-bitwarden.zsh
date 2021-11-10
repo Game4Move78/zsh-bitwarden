@@ -70,7 +70,7 @@ bw_search() {
   local visible=()
   local out=()
   local o search colopts
-  while getopts ":c:Cs:oOh" o; do
+  while getopts ":c:s:" o; do
     case $o in
       h) # Help message
         echo "Usage: $0 [options] JQPATHS"
