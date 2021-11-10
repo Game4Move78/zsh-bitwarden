@@ -169,51 +169,52 @@ bw_password() {
 }
 
 bw_edit_item() {
-  local uuid=$(</dev/stdin)
   local field
   local hidden=false
-  while getopts ":f:h" o; do
+  while getopts ":f:i:" o; do
     case $o in
+      i)
+        uuid=$OPTARG
+        ;;
       f)
         field=$OPTARG
-        ;;
-      h)
-        hidden=true
         ;;
     esac
   done
 
   local item=$(bw get item $uuid)
-  local fval=$(jq -r "$field" <<< $item)
-  local fprompt="Enter new value for $field: "
-  if [ "$hidden" = true ]; then
-    IFS= read -rs "fval?$fprompt"
-  else
-    vared -p "$fprompt" -c fval
-  fi
-  jq "$field=\"$fval\"" <<< $item | bw encode | bw edit item $uuid > /dev/null
-  echo "Field updated"
+  local fnew=$(cat)
+  jq "$field=\"$fnew\"" <<< $item | bw encode | bw edit item $uuid > /dev/null
 }
 
 bw_edit_name() {
   if ! bw_unlock; then
     return 1
   fi
-  bw_search -c Occ -s "$*" .id .name .login.username | bw_edit_item -f .name
+  local uuid=$(bw_search -c Occ -s "$*" .id .name .login.username)
+  local fval=$(bw get item $uuid | jq -r '.name')
+  vared -p "Edit name > " fval
+  bw_edit_item -f .name -i $uuid <<< $fval
 }
 
 bw_edit_username() {
   if ! bw_unlock; then
     return 1
   fi
-  bw_search -c Occ -s "$*" .id .name .login.username | bw_edit_item -f .login.username
+  local uuid=$(bw_search -c Occ -s "$*" .id .name .login.username)
+  local fval=$(bw get item $uuid | jq -r '.login.username')
+  vared -p "Edit username > " fval
+  bw_edit_item -f .login.username -i $uuid <<< $fval
 }
 
 bw_edit_password() {
   if ! bw_unlock; then
     return 1
   fi
-  bw_search -c Occ -s "$*" .id .name .login.username | bw_edit_item -s -hf .login.password
+  local uuid=$(bw_search -c Occ -s "$*" .id .name .login.username)
+  local fval=$(bw get item $uuid | jq -r '.login.password')
+  vared -p "Edit password > " fval
+  bw_edit_item -f .login.password -i $uuid <<< $fval
 }
 
 alias bwul='bw_unlock'
@@ -224,3 +225,4 @@ alias bwup='bw_user_pass'
 alias bwne='bw_edit_name'
 alias bwuse='bw_edit_username'
 alias bwpwe='bw_edit_password'
+alias bwpwg='bw generate'
