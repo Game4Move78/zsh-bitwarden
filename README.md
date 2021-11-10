@@ -13,6 +13,7 @@ See [INSTALL.md](INSTALL.md).
 - Use `bwuse SEARCH` to edit a username
 - Use `bwpw SEARCH` to get a password
 - Use `bwpwe SEARCH` to edit a password
+- Use `bwne SEARCH` to edit an item name
 - Use `bwup SEARCH` to copy username then password to clipboard
 - Use `bwse [OPTIONS]... JPATHS` to search
 
