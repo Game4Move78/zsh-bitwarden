@@ -214,15 +214,6 @@ bw_edit_password() {
   local uuid=$(bw_search -c Occ -s "$*" .id .name .login.username)
   local fval=$(bw get item $uuid | jq -r '.login.password')
   bw_edit_item -f .login.password -i $uuid
-}
-
-bw_generate_password() {
-  if ! bw_unlock; then
-    return 1
-  fi
-  local uuid=$(bw_search -c Occ -s "$*" .id .name .login.username)
-  local fval=$(bw get item $uuid | jq -r '.login.password')
-  bw generate $* | bw_edit_item -f .login.password -i $uuid
   echo $fval
 }
 
@@ -234,4 +225,4 @@ alias bwup='bw_user_pass'
 alias bwne='bw_edit_name'
 alias bwuse='bw_edit_username'
 alias bwpwe='bw_edit_password'
-alias bwpwg='bw_generate_password'
+alias bwg='bw generate'
