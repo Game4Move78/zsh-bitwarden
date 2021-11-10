@@ -150,7 +150,7 @@ bw_user_pass() {
   if ! bw_unlock; then
     return 1
   fi
-  local userpass=$(bw_search -c coOc -s "$*" .name .login.username .login.password .notes)
+  local userpass=$(bw_search -c coO -s "$*" .name .login.username .login.password)
   if [[ "$?" -ne 0 ]]; then
     return 2
   fi
@@ -161,11 +161,11 @@ bw_user_pass() {
 }
 
 bw_username() {
-  bw_unlock && bw_search -c coc -s "$*" .name .login.username .notes
+  bw_unlock && bw_search -c co -s "$*" .name .login.username
 }
 
 bw_password() {
-  bw_unlock && bw_search -c ccOc -s "$*" .name .login.username .login.password .notes
+  bw_unlock && bw_search -c ccO -s "$*" .name .login.username .login.password
 }
 
 # TODO IMPLEMENT
