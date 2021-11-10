@@ -1,5 +1,6 @@
 # zsh-bitwarden
 This plugin provides functions to manage a bitwarden session
+This plugin provides functions to manage a [bitwarden](https://github.com/bitwarden/cli) session
 
 
 ## Installation
