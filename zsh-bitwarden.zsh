@@ -168,33 +168,31 @@ bw_password() {
   bw_unlock && bw_search -c ccO -s "$*" .name .login.username .login.password
 }
 
-# TODO IMPLEMENT
-bw_edit() {
-  echo "Not implemented"
-  return 1
-  local result=$(bw_search $* | tr $'\t' '\n' | nl)
-  local outidxs=()
-  while getopts ":c:Cs:oOh" o; do
+bw_edit_item() {
+  local uuid=$(</dev/stdin)
+  local field
+  local hidden=false
+  while getopts ":f:h" o; do
     case $o in
-      c) # Column options
-        colopts=$OPTARG
-        for (( i=1; i<=${#colopts}; i++)); do
-          echo $i "${colopts[i]}"
-          if [ "${colopts[i]}" = "o" ] || [ "${colopts[i]}" = "O" ]; then
-            outidxs+=("$i")
-          fi
-        done
+      f)
+        field=$OPTARG
         ;;
-      *) # Discard
-      ;;
+      h)
+        hidden=true
+        ;;
     esac
   done
-  shift $(($OPTIND - 1))
-  echo $result
-  local fieldnames=()
-  for idx in "$outidxs"; do
-    fieldnames+=(${@:$idx:1})
-  done
+
+  local item=$(bw get item $uuid)
+  local fval=$(jq -r "$field" <<< $item)
+  local fprompt="Enter new value for $field: "
+  if [ "$hidden" = true ]; then
+    IFS= read -rs "fval?$fprompt"
+  else
+    vared -p "$fprompt" -c fval
+  fi
+  jq "$field=\"$fval\"" <<< $item | bw encode | bw edit item $uuid > /dev/null
+  echo "Field updated"
 }
 
 
