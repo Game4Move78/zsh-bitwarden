@@ -55,3 +55,10 @@ have the password provided in standard input. An example of this would be `bwg
 -ulns --length 20 | bwpwe SEARCH` which will generate a new random password for
 `SEARCH` and output the old password. Use of `bwg` is described in the [bw-cli
 manual](https://bitwarden.com/help/article/cli/#generate).
+
+For fun if `sshd` is running in Termux, then to store DUOSEC codes in `bw`
+```
+(codes=$(ssh $DEVICE_IP -p 8022 
+"termux-sms-list | jq -r '.[] | select(.number==\"DUOSEC\") | .body' | cut -d' ' -f3- | tail -1") 
+&& bwnoe DUOSEC <<< "$codes")
+```
