@@ -39,7 +39,7 @@ _bw_table() {
   done
   echo
   # Construct tsv with values selected using args
-  jq -er ".[] | [$keys] | @tsv" <<< $json 2> -
+  (jq -e ".[] | [$keys]" | jq -r "@tsv") <<< $json 2> /dev/null
   if [[ "$?" -ne 0 ]]; then
     echo "Unable to construct array [$keys]"
     return 1
@@ -55,7 +55,7 @@ _bw_select() {
   local tsv=$(</dev/stdin)
   local cols=$(IFS=, ; echo "$@")
   # Printable table with index field
-  local tbl=$(echo $tsv | cut -d $'\t' -f "$cols" | column -t -s $'\t' | nl -n rz)
+  local tbl=$(cut -d $'\t' -f "$cols" <<< $tsv | column -t -s $'\t' | nl -n rz)
   local row=$(fzf -d $'\t' --with-nth 2 --select-1 --header-lines=1 <<< $tbl\
     | awk '{print $1}')
   if [[ "$?" -ne 0 ]]; then
@@ -168,6 +168,11 @@ bw_password() {
   bw_unlock && bw_search -c ccO -s "$*" .name .login.username .login.password
 }
 
+bw_notes() {
+  # The only way I knew how to convert escaped sequences to literals
+  bw_unlock && echo "$(bw_search -c co -s "$*" .name .notes)"
+}
+
 bw_edit_item() {
   local field
   local hidden=false
@@ -217,12 +222,24 @@ bw_edit_password() {
   echo $fval
 }
 
+bw_edit_notes() {
+  if ! bw_unlock; then
+    return 1
+  fi
+  local uuid=$(bw_search -c Occ -s "$*" .id .name .notes)
+  local fval=$(bw get item $uuid | jq -r '.notes')
+  bw_edit_item -f .notes -i $uuid
+  echo $fval
+}
+
 alias bwul='bw_unlock'
 alias bwse='bw_unlock && bw_search'
 alias bwus='bw_username'
 alias bwpw='bw_password'
+alias bwno='bw_notes'
 alias bwup='bw_user_pass'
 alias bwne='bw_edit_name'
 alias bwuse='bw_edit_username'
 alias bwpwe='bw_edit_password'
+alias bwne='bw_edit_notes'
 alias bwg='bw generate'
