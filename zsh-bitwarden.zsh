@@ -28,8 +28,6 @@ _bw_table() {
     return 1
   fi
   local json=$(</dev/stdin)
-  # Comma-join arguments
-  local keys=$(IFS=, ; echo "$*")
   # Output arguments as tsv header
   echo -n $1
   for arg in "${@:2}"
@@ -38,8 +36,15 @@ _bw_table() {
     echo -n "$arg"
   done
   echo
+  local width="$#"
+  # Comma-join arguments
+  keys="($1)"
+  shift 1
+  for key in "$@"; do
+    keys="$keys,($key)"
+  done
   # Construct tsv with values selected using args
-  (jq -e ".[] | [$keys]" | jq -r "@tsv") <<< $json 2> /dev/null
+  (jq -e ".[] | [$keys] | select( length == $width)" | jq -r "@tsv") <<< $json 2> /dev/null
   if [[ "$?" -ne 0 ]]; then
     echo "Unable to construct array [$keys]"
     return 1
@@ -173,6 +178,11 @@ bw_notes() {
   bw_unlock && echo "$(bw_search -c co -s "$*" .name .notes)"
 }
 
+bw_field() {
+  local fieldpath=".fields[]? | select(.name == \"$2\") | .value"
+  bw_unlock && bw_search -c co -s "$1" .name "$fieldpath"
+}
+
 bw_edit_item() {
   local field
   local hidden=false
@@ -190,6 +200,20 @@ bw_edit_item() {
   local item=$(bw get item $uuid)
   local fnew=$(cat)
   jq "$field=\"$fnew\"" <<< $item | bw encode | bw edit item $uuid > /dev/null
+}
+
+bw_edit_field() {
+  if ! bw_unlock; then
+    return 1
+  fi
+  local fieldpath=".fields[]? | select(.name == \"$2\") | .value"
+  local uuid=$(bw_search -c Occ -s "$1" .id .name "$fieldpath")
+  local item=$(bw get item $uuid)
+  local fval=$(jq -r "$fieldpath" <<< $item)
+  local fvalindex=$(jq -r '.fields | map(.name == "Email") | index(true)' <<< $item)
+  local fvalabspath=".fields[$fvalindex].value"
+  vared -p "Edit $2 > " fval
+  bw_edit_item -f "$fvalabspath" -i $uuid <<< $fval
 }
 
 bw_edit_name() {
@@ -237,9 +261,11 @@ alias bwse='bw_unlock && bw_search'
 alias bwus='bw_username'
 alias bwpw='bw_password'
 alias bwno='bw_notes'
+alias bwfl='bw_field'
 alias bwup='bw_user_pass'
 alias bwne='bw_edit_name'
 alias bwuse='bw_edit_username'
 alias bwpwe='bw_edit_password'
 alias bwnoe='bw_edit_notes'
+alias bwfle='bw_edit_field'
 alias bwg='bw generate'
