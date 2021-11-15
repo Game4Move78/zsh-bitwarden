@@ -60,9 +60,31 @@ have the password provided in standard input. An example of this would be `bwg
 `SEARCH` and output the old password. Use of `bwg` is described in the [bw-cli
 manual](https://bitwarden.com/help/article/cli/#generate).
 
-For fun if `sshd` is running in Termux, then to store DUOSEC codes in `bw`
+For fun if `sshd` is running in Termux, then to store the lasted SMS DUOSEC codes in `bw`
 ```
-(codes=$(ssh $DEVICE_IP -p 8022 
-"termux-sms-list | jq -r '.[] | select(.number==\"DUOSEC\") | .body' | cut -d' ' -f3- | tail -1") 
-&& bwnoe DUOSEC <<< "$codes")
+bw-new-codes() {
+  local codes=$(ssh $DEVICE_IP -p 8022 "termux-sms-list | jq -r '.[]"\
+                    "| select(.number==\"DUOSEC\") | .body' | cut -d' ' -f3- "\
+                    "| tail -1")
+  bwnoe DUOSEC <<< "$codes"
+}
+
+bw-pop-duocode() {
+  bwno DUOSEC | awk '{$1=""; print $0}' | bwnoe DUOSEC | awk '{print $1}'
+}
+
+bw-duocode() {
+  local code=$(bw-pop-duocode)
+  echo $code
+  if grep '^\W*5' <<< $code; then
+    echo -n "Last duosec code. Loading new codes in... "
+    sleep 1
+    echo -n "1... "
+    sleep 1
+    echo -n "2... "
+    sleep 1
+    echo -n "3 "
+    bw-new-codes
+  fi
+}
 ```
