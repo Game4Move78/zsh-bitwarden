@@ -75,7 +75,7 @@ bw-pop-duocode() {
 
 bw-duocode() {
   local code=$(bw-pop-duocode)
-  echo $code
+  clipcopy <<< $code
   if grep '^\W*5' <<< $code; then
     echo -n "Last duosec code. Loading new codes in... "
     sleep 1
