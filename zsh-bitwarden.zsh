@@ -261,8 +261,16 @@ bw_create_login() {
     return 1
   fi
   local name username password
-  vared -p "Login item name > " name
-  vared -p "Login item username > " username
+  if [[ "$#" -lt 1 ]]; then
+    vared -p "Login item name > " name
+  else
+    name="$1"
+  fi
+  if [[ "$#" -lt 2 ]]; then
+    vared -p "Login item username > " username
+  else
+    username="$2"
+  fi
   uuid=$(bw get template item \
   | jq ".name=\"${name}\" | .login={\"username\":\"${username}\"}" \
   | bw encode | bw create item | jq -r '.id')
