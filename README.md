@@ -20,6 +20,7 @@ See [INSTALL.md](INSTALL.md).
 - Use `bwne SEARCH` to edit an item name
 - Use `bwup SEARCH` to copy username then password to clipboard
 - Use `bwse [OPTIONS]... JPATHS` to search
+- Use `bwlc` to create a login item
 
 ## Examples
 

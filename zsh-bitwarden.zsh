@@ -256,6 +256,20 @@ bw_edit_notes() {
   echo $fval
 }
 
+bw_create_login() {
+  if ! bw_unlock; then
+    return 1
+  fi
+  local name username password
+  vared -p "Login item name > " name
+  vared -p "Login item username > " username
+  uuid=$(bw get template item \
+  | jq ".name=\"${name}\" | .login={\"username\":\"${username}\"}" \
+  | bw encode | bw create item | jq -r '.id')
+  echo "Created item $uuid. To set a password use"
+  echo "bwpwe $uuid"
+}
+
 alias bwul='bw_unlock'
 alias bwse='bw_unlock && bw_search'
 alias bwus='bw_username'
@@ -269,3 +283,4 @@ alias bwpwe='bw_edit_password'
 alias bwnoe='bw_edit_notes'
 alias bwfle='bw_edit_field'
 alias bwg='bw generate'
+alias bwlc='bw_create_login'
