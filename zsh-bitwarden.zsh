@@ -23,10 +23,10 @@
 
 _bw_test_subshell() {
   local pid=$(exec sh -c 'echo $PPID')
-  if [ ! "$$" -eq $pid ]; then
-    return 1
-  else
+  if [ "$$" -eq "$pid" ]; then
     return 0
+  else
+    return 1
   fi
 }
 # Takes JSON as stdin and jq paths to extract into tsv as args
@@ -153,7 +153,7 @@ bw_unlock() {
   #TODO Substitute obscure "mac failed" message with "please sync vault"
   if [ -z $BW_SESSION ] || [ "$(bw status | jq -r '.status')" = "locked" ]; then
     if ! _bw_test_subshell; then
-      echo "Can't export session key in forked process. Try `bw_unlock` before piping." >&2
+      echo "Can't export session key in forked process. Try \`bw_unlock\` before piping." >&2
       return 1
     fi
     if BW_SESSION=$(bw unlock --raw); then
