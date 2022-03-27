@@ -21,6 +21,14 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+_bw_get_alias() {
+  local found_alias=$(alias | grep -E "=\W*$1\W*$" | cut -d'=' -f1)
+  if [ -z $found_alias ]; then
+    echo "$1"
+  else
+    echo "$found_alias"
+  fi
+}
 _bw_test_subshell() {
   local pid=$(exec sh -c 'echo $PPID')
   if [ "$$" -eq "$pid" ]; then
@@ -153,7 +161,8 @@ bw_unlock() {
   #TODO Substitute obscure "mac failed" message with "please sync vault"
   if [ -z $BW_SESSION ] || [ "$(bw status | jq -r '.status')" = "locked" ]; then
     if ! _bw_test_subshell; then
-      echo "Can't export session key in forked process. Try \`bw_unlock\` before piping." >&2
+      local bwul_alias=$(_bw_get_alias bw_unlock)
+      echo "Can't export session key in forked process. Try \`$bwul_alias\` before piping." >&2
       return 1
     fi
     if BW_SESSION=$(bw unlock --raw); then
