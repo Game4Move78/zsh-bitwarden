@@ -32,7 +32,7 @@ _bw_get_alias() {
 
 _bw_test_subshell() {
   local pid=$(exec sh -c 'echo $PPID')
-  if [ "$$" -eq "$pid" ]; then
+  if [[ "$$" == "$pid" ]]; then
     return 0
   else
     return 1
@@ -41,7 +41,7 @@ _bw_test_subshell() {
 
 # Takes JSON as stdin and jq paths to extract into tsv as args
 _bw_table() {
-  if [[ "$#" -eq 0 ]]; then
+  if [[ "$#" == 0 ]]; then
     echo "Usage: $0 [PATH]..."
     return 1
   fi
@@ -71,7 +71,7 @@ _bw_table() {
 
 # Takes tsv as stdin and columns to show in fzf as args
 _bw_select() {
-  if [[ "$#" -eq 0 ]]; then
+  if [[ "$#" == 0 ]]; then
     echo "Usage: $0 [COLUMN INDEX]..."
     return 1
   fi
@@ -141,16 +141,16 @@ bw_search() {
         ;;
     esac
   done
-  if [[ "${#visible}" -eq 0 ]]; then
+  if [[ "${#visible}" == 0 ]]; then
       echo "No visible fields entered" >&2
     return 1
   fi
-  if [[ "${#out}" -eq 0 ]]; then
+  if [[ "${#out}" == 0 ]]; then
     echo "No output fields entered" >&2
     return 2
   fi
   items=$(bw list items --search "$search")
-  if [ $(jq '. | length' <<< $items) -eq 0 ]; then
+  if [[ $(jq '. | length' <<< $items) == 0 ]]; then
     echo "No results. Try '-s .' to search through all items." >&2
     return 4
   fi
