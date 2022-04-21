@@ -29,6 +29,7 @@ _bw_get_alias() {
     echo "$found_alias"
   fi
 }
+
 _bw_test_subshell() {
   local pid=$(exec sh -c 'echo $PPID')
   if [ "$$" -eq "$pid" ]; then
@@ -37,6 +38,7 @@ _bw_test_subshell() {
     return 1
   fi
 }
+
 # Takes JSON as stdin and jq paths to extract into tsv as args
 _bw_table() {
   if [[ "$#" -eq 0 ]]; then
@@ -154,7 +156,8 @@ bw_search() {
   fi
   _bw_table $@ <<< $items \
     | _bw_select ${visible[@]} \
-    | cut -f$(IFS=, ; echo "${out[*]}")
+    | cut -f$(IFS=, ; echo "${out[*]}") \
+    | sed -z '$ s/\n$//'
 }
 
 bw_unlock() {
@@ -300,6 +303,23 @@ bw_create_login() {
   echo "bwpwe $uuid"
 }
 
+bw_create_note() {
+  if ! bw_unlock; then
+    return 1
+  fi
+  local name
+  if [[ "$#" -lt 1 ]]; then
+    vared -p "Note item name > " name
+  else
+    name="$1"
+  fi
+  uuid=$(bw get template item \
+           | jq ".name=\"${name}\"" \
+           | bw encode | bw create item | jq -r '.id')
+  echo "Created item $uuid. To set a password use"
+  echo "bwpwe $uuid"
+}
+
 alias bwul='bw_unlock'
 alias bwse='bw_unlock && bw_search'
 alias bwus='bw_username'
@@ -314,3 +334,4 @@ alias bwnoe='bw_edit_notes'
 alias bwfle='bw_edit_field'
 alias bwg='bw generate'
 alias bwlc='bw_create_login'
+alias bwlc='bw_create_note'
