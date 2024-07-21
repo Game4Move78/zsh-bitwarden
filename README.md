@@ -9,6 +9,8 @@ See [INSTALL.md](INSTALL.md).
 ## Usage
 
 - Use `bwul` to unlock the vault, setting the env variable $BW_SESSION.
+- Use `bwg` to generate a complex password (alphanumeric + special)
+- Use `bwgs` to generate a simple password (alphanumeric)
 - Use `bwus SEARCH` to get a username
 - Use `bwuse SEARCH` to edit a username
 - Use `bwpw SEARCH` to get a password
@@ -23,6 +25,17 @@ See [INSTALL.md](INSTALL.md).
 - Use `bwlc [NAME] [USERNAME]` to create a login item
 
 ## Examples
+
+```
+# unlock vault
+bwul
+# create entry called `mylogin` with username `user123@example.com` and secure password
+bwg | bwlc mylogin user123@example.com'
+# get username and password
+bwup mylogin
+```
+
+## Notes
 
 `bwus` and `bwpw` both delegate to `bwse`. `bwse` searches over all items
 letting the user select one using `fzf`. Each item has a set of fields some of

@@ -299,8 +299,13 @@ bw_create_login() {
   uuid=$(bw get template item \
   | jq ".name=\"${name}\" | .login={\"username\":\"${username}\"}" \
   | bw encode | bw create item | jq -r '.id')
-  echo "Created item $uuid. To set a password use"
-  echo "bwpwe $uuid"
+  if [ -t 0 ] ; then
+    { bwg | bwpwe $uuid > /dev/null; }
+    echo "Created item $uuid. To change password use"
+    echo "bwpwe $uuid"
+  else
+    { bwpwe $uuid > /dev/null; }
+  fi
 }
 
 bw_create_note() {
@@ -316,8 +321,6 @@ bw_create_note() {
   uuid=$(bw get template item \
            | jq ".name=\"${name}\"" \
            | bw encode | bw create item | jq -r '.id')
-  echo "Created item $uuid. To set a password use"
-  echo "bwpwe $uuid"
 }
 
 alias bwul='bw_unlock'
@@ -332,6 +335,7 @@ alias bwuse='bw_edit_username'
 alias bwpwe='bw_edit_password'
 alias bwnoe='bw_edit_notes'
 alias bwfle='bw_edit_field'
-alias bwg='bw generate'
+alias bwg='bw generate -ulns --length 20'
+alias bwgs='bw generate -uln --length 20'
 alias bwlc='bw_create_login'
 alias bwln='bw_create_note'
