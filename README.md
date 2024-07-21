@@ -70,7 +70,7 @@ This will return the item id and password in TSV format.
 
 While `bwuse` and `bwne` accept interactive input using `vared`, `bwpwe` must
 have the password provided in standard input. An example of this would be `bwg
--ulns --length 20 | bwpwe SEARCH` which will generate a new random password for
+| bwpwe SEARCH` which will generate a new random password for
 `SEARCH` and output the old password. Use of `bwg` is described in the [bw-cli
 manual](https://bitwarden.com/help/article/cli/#generate).
 
