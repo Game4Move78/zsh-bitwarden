@@ -48,16 +48,18 @@ _bw_table() {
   local json=$(</dev/stdin)
   # Output arguments as tsv header
   printf "%s" "$1"
+  for arg in "${@:2}"; do
     printf "\t%s" "$arg"
   done
   echo
-  local width="$#"
   # Comma-join arguments
-  keys="($1)"
+  local width="$#"
+  local keys="($1)"
   shift 1
   for key in "$@"; do
     keys="$keys,($key)"
   done
+
   # Construct tsv with values selected using args
   (jq -e ".[] | [$keys] | select( length == $width)" | jq -r "@tsv") <<< $json 2> /dev/null
   if [[ "$?" -ne 0 ]]; then
