@@ -61,7 +61,8 @@ _bw_table() {
   done
 
   # Construct tsv with values selected using args
-  (jq -e ".[] | [$keys] | select( length == $width)" | jq -r "@tsv") <<< $json 2> /dev/null
+  jq -e ".[] | [$keys] | select( length == $width)" <<< "$json" 2> /dev/null | jq -r "@tsv"
+
   if [[ "$?" -ne 0 ]]; then
     echo "Unable to process the input or extract the desired fields with jq (array: $keys)"
     return 1
