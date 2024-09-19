@@ -61,7 +61,7 @@ _bw_table() {
   done
 
   # Construct tsv with values selected using args
-  jq -e ".[] | [$keys] | select( length == $width)" <<< "$json" 2> /dev/null | jq -r "@tsv"
+  jq -e ".[] | [$keys] | select(all(.[]; . != null) and length == $width)" <<< "$json" 2> /dev/null | jq -r "@tsv"
 
   if [[ "$?" -ne 0 ]]; then
     echo "Unable to process the input or extract the desired fields with jq (array: $keys)"
@@ -75,17 +75,38 @@ _bw_select() {
     echo "Usage: $0 [COLUMN INDEX]..."
     return 1
   fi
+
+  # Read input from stdin
   local tsv=$(</dev/stdin)
+
+  # Validate that the input TSV is not empty
+  if [[ -z "$tsv" ]]; then
+    echo "Error: No input provided. Please provide a valid TSV input." >&2
+    return 1
+  fi
+
+  # Join column indices with commas for the cut command
   local cols=$(IFS=, ; echo "$@")
-  # Printable table with index field
+
+  # Construct a formatted table with row indices
   local tbl=$(cut -d $'\t' -f "$cols" <<< $tsv | column -t -s $'\t' | nl -n rz)
-  local row=$(fzf -d $'\t' --with-nth 2 --select-1 --header-lines=1 <<< $tbl\
+
+  # Check if the table was generated correctly
+  if [[ -z "$tbl" ]]; then
+    echo "Error: Unable to generate table. Please check the column indices." >&2
+    return 1
+  fi
+
+  local row=$(fzf -d $'\t' --with-nth 2 --select-1 --header-lines=1 <<< "$tbl"\
     | awk '{print $1}')
-  if [[ "$?" -ne 0 ]]; then
+
+  if [[ "$?" -ne 0 || -z "$row" ]]; then
     echo "Couldn't return value from fzf. Is the header line missing?" >&2
     return 2
   fi
-  sed -n "${row}p" <<< $tsv
+
+  # Output the corresponding row from the original tsv
+  sed -n "${row}p" <<< "$tsv"
 }
 
 bw_search() {
@@ -93,22 +114,27 @@ bw_search() {
   local visible=()
   local out=()
   local o search colopts
-  while getopts ":c:s:" o; do
+
+  while getopts ":c:s:h" o; do
     case $o in
       h) # Help message
-        echo "Usage: $0 [options] JQPATHS"
-        echo "Construct tsv of bitwarden search items results and select with"\
-             "fzf if multiple\nare found."
-        echo
-        echo "-c COLS    Each character of COL specifies option for"\
-             "corresponding column."
-        echo "-s ID      Search string passed to bw --search [ID]"
-        echo "-h         Display this help and exit"
-        echo
-        echo "Examples:"
-        echo "  \$ $0 -c ccOc -s github .name .login.username .login.password .notes"\
-             "\\ \n      | clipcopy"
-        echo "  \$ $0 -c co -s github .name .login.username | clipcopy"
+        cat <<EOF
+Usage: $0 [options] JQPATHS
+
+Constructs TSV from Bitwarden search items and allows selection with fzf if multiple are found.
+
+Options:
+  -c COLS    Each character in COL specifies an option for corresponding column:
+               'c' = visible column, but not in the output.
+               'o' = visible and output column.
+               'O' = hidden but output column.
+  -s SEARCH  Search string passed to 'bw list items --search'.
+  -h         Display this help and exit.
+
+Examples:
+  $0 -c ccOo -s github .name .login.username .login.password .notes
+  $0 -c co -s github .name .login.username | clipcopy
+EOF
         return 0
         ;;
       s) # Search string
@@ -117,30 +143,48 @@ bw_search() {
       c) # Column options
         colopts=$OPTARG
         ;;
+      *) # Invalid option
+        echo "Invalid option: -$OPTARG" >&2
+        return 1
+        ;;
     esac
   done
   shift $(($OPTIND - 1))
-  # Process remaining args
-  if [ ${#colopts} -lt $# ]; then
-    # Extend $colopts with defaults to have an option for each column
-    local remaining=$(printf 'o%.0s' {${#colopts}..$(($# - 1))})
-    colopts="$colopts$remaining"
+
+  # Validate remaining arguments (JQ paths)
+  if [ $# -lt 1 ]; then
+    echo "Error: At least one JQ path must be provided." >&2
+    return 1
   fi
+
+  # Ensure the number of colopts matches the number of paths
+  if [ ${#colopts} -ne $# ]; then
+    echo "Error: The number of column options (${#colopts}) does not match the number of JQ paths ($#)." >&2
+    return 1
+  fi
+
   # Process the column options
-  for (( i=1; i<=${#colopts}; i++)); do
-    case "${colopts[i]}" in
+  for ((i = 0; i < ${#colopts}; i++)); do
+    local opt="${colopts:$i:1}"
+    case "$opt" in
       c)
-        visible+=($i)
+        visible+=($((i + 1)))  # Add column index to visible
         ;;
       o)
-        visible+=($i)
-        out+=($i)
+        visible+=($((i + 1)))
+        out+=($((i + 1)))  # Visible and output
         ;;
       O)
-        out+=($i)
+        out+=($((i + 1)))  # Output only, not visible
+        ;;
+      *)
+        echo "Error: Invalid column option '$opt' at position $((i + 1))" >&2
+        return 1
         ;;
     esac
   done
+
+  # Ensure there are visible and output fields
   if [[ "${#visible}" == 0 ]]; then
       echo "No visible fields entered" >&2
     return 1
@@ -149,15 +193,21 @@ bw_search() {
     echo "No output fields entered" >&2
     return 2
   fi
-  items=$(bw list items --search "$search")
-  if [[ $(jq '. | length' <<< $items) == 0 ]]; then
-    echo "No results. Try '-s .' to search through all items." >&2
+
+  # Search using bitwarden
+  local items=$(bw list items --search "$search" 2>/dev/null)
+
+  if [ $? -ne 0 ] || [ -z "$items" ] || [ $(jq '. | length' <<< "$items") -eq 0 ]; then
+    echo "No results found. Try '-s .' to search all items." >&2
     return 4
   fi
-  _bw_table $@ <<< $items \
-    | _bw_select ${visible[@]} \
+
+  # Use _bw_table to create TSV, pipe it through _bw_select to fzf, then cut the output fields
+  _bw_table "$@" <<< "$items" \
+    | _bw_select "${visible[@]}" \
     | cut -f$(IFS=, ; echo "${out[*]}") \
     | sed -z '$ s/\n$//'
+
 }
 
 bw_unlock() {
