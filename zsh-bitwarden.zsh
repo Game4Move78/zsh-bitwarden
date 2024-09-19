@@ -23,7 +23,7 @@
 
 _bw_get_alias() {
   local found_alias=$(alias | grep -E "=\W*$1\W*$" | cut -d'=' -f1)
-  if [ -z $found_alias ]; then
+  if [ -z "$found_alias" ]; then
     echo "$1"
   else
     echo "$found_alias"
@@ -52,6 +52,8 @@ _bw_table() {
   do
     echo -en "\t"
     echo -n "$arg"
+  printf "%s" "$1"
+    printf "\t%s" "$arg"
   done
   echo
   local width="$#"
