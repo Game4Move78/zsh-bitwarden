@@ -47,11 +47,6 @@ _bw_table() {
   fi
   local json=$(</dev/stdin)
   # Output arguments as tsv header
-  echo -n $1
-  for arg in "${@:2}"
-  do
-    echo -en "\t"
-    echo -n "$arg"
   printf "%s" "$1"
     printf "\t%s" "$arg"
   done
