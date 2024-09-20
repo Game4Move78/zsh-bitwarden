@@ -46,27 +46,28 @@ _bw_table() {
     return 1
   fi
   local json=$(</dev/stdin)
+  # Comma-join arguments
+  local width="$#"
+  local keys="($1)? // null"
+  for key in "${@:2}"; do
+    keys="$keys, ($key)? // null"
+  done
+
+  # Construct tsv with values selected using args
+  local jq_output=$(jq -e ".[] | [$keys] | select(all(.[]; . != null) and length == $width)" <<< "$json" 2> /dev/null | jq -r "@tsv")
+
+  if [[ -z "$jq_output" ]]; then
+    return 1
+  fi
+
   # Output arguments as tsv header
   printf "%s" "$1"
   for arg in "${@:2}"; do
     printf "\t%s" "$arg"
   done
-  echo
-  # Comma-join arguments
-  local width="$#"
-  local keys="($1)"
-  shift 1
-  for key in "$@"; do
-    keys="$keys,($key)"
-  done
+  printf "\n"
 
-  # Construct tsv with values selected using args
-  jq -e ".[] | [$keys] | select(all(.[]; . != null) and length == $width)" <<< "$json" 2> /dev/null | jq -r "@tsv"
-
-  if [[ "$?" -ne 0 ]]; then
-    echo "Unable to process the input or extract the desired fields with jq (array: $keys)"
-    return 1
-  fi
+  printf "%s\n" "$jq_output"
 }
 
 # Takes tsv as stdin and columns to show in fzf as args
@@ -115,7 +116,7 @@ bw_search() {
   local out=()
   local o search colopts
 
-  while getopts ":c:s:h" o; do
+  while getopts ":c:s::h" o; do
     case $o in
       h) # Help message
         cat <<EOF
@@ -160,13 +161,16 @@ EOF
   # Ensure the number of colopts matches the number of paths
   if [ ${#colopts} -ne $# ]; then
     echo "Error: The number of column options (${#colopts}) does not match the number of JQ paths ($#)." >&2
+    for arg in "$@"; do
+      echo "ARG: $arg"
+    done
     return 1
   fi
 
   # Process the column options
   for ((i = 0; i < ${#colopts}; i++)); do
-    local opt="${colopts:$i:1}"
-    case "$opt" in
+    local colopt="${colopts:$i:1}"
+    case "$colopt" in
       c)
         visible+=($((i + 1)))  # Add column index to visible
         ;;
@@ -178,7 +182,7 @@ EOF
         out+=($((i + 1)))  # Output only, not visible
         ;;
       *)
-        echo "Error: Invalid column option '$opt' at position $((i + 1))" >&2
+        echo "Error: Invalid column option '$colopt' at position $((i + 1))" >&2
         return 1
         ;;
     esac
@@ -230,7 +234,7 @@ bw_user_pass() {
   if ! bw_unlock; then
     return 1
   fi
-  local userpass=$(bw_search -c coO -s "$*" .name .login.username .login.password)
+  local userpass=$(bw_search -c coO -s "$1" .name .login.username .login.password)
   if [[ "$?" -ne 0 ]]; then
     return 2
   fi
@@ -240,22 +244,26 @@ bw_user_pass() {
   read _ && cut -f 2 <<< $userpass | clipcopy
 }
 
+bw_name() {
+  bw_unlock && bw_search -c oc -s "$1" .name .login.username
+}
+
 bw_username() {
-  bw_unlock && bw_search -c co -s "$*" .name .login.username
+  bw_unlock && bw_search -c co -s "$1" .name .login.username
 }
 
 bw_password() {
-  bw_unlock && bw_search -c ccO -s "$*" .name .login.username .login.password
+  bw_unlock && bw_search -c ccO -s "$1" .name .login.username .login.password
 }
 
 bw_notes() {
-  # The only way I knew how to convert escaped sequences to literals
-  bw_unlock && echo "$(bw_search -c co -s "$*" .name .notes)"
+  bw_unlock && bw_search -c co -s "$1" .name .notes
 }
 
 bw_field() {
-  local fieldpath=".fields[]? | select(.name == \"$2\") | .value"
-  bw_unlock && bw_search -c co -s "$1" .name "$fieldpath"
+  local fieldpath=".fields[]? | select(.name == \"$1\") | .value"
+
+  bw_unlock && bw_search -c co -s "$2" .name "$fieldpath"
 }
 
 bw_edit_item() {
@@ -273,7 +281,8 @@ bw_edit_item() {
   done
 
   local item=$(bw get item $uuid)
-  local fnew=$(cat)
+  local fnew=$(</dev/stdin)
+
   jq "$field=\"$fnew\"" <<< $item | bw encode | bw edit item $uuid > /dev/null
 }
 
@@ -281,61 +290,70 @@ bw_edit_field() {
   if ! bw_unlock; then
     return 1
   fi
-  local fieldpath=".fields[]? | select(.name == \"$2\") | .value"
-  local uuid=$(bw_search -c Occ -s "$1" .id .name "$fieldpath")
-  local item=$(bw get item $uuid)
-  local fval=$(jq -r "$fieldpath" <<< $item)
-  local fvalindex=$(jq -r '.fields | map(.name == "Email") | index(true)' <<< $item)
-  local fvalabspath=".fields[$fvalindex].value"
-  vared -p "Edit $2 > " fval
-  bw_edit_item -f "$fvalabspath" -i $uuid <<< $fval
+  local path_val=".fields[]? | select(.name == \"$2\") | .value"
+  local path_idx=".fields | map(.name) | index(\"$2\")"
+  local uuid val idx
+  bw_search -c OcoO -s "$1" .id .name "$path_val" "$path_idx" | IFS=$'\t' read -r uuid val idx
+  vared -p "Edit $2 > " val
+  bw_edit_item -f ".fields[$idx].value" -i "$uuid" <<< "$val"
 }
 
 bw_edit_name() {
   if ! bw_unlock; then
     return 1
   fi
-  local uuid=$(bw_search -c Occ -s "$*" .id .name .login.username)
-  local fval=$(bw get item $uuid | jq -r '.name')
-  vared -p "Edit name > " fval
-  bw_edit_item -f .name -i $uuid <<< $fval
+  local uuid val
+  bw_search -c Ooc -s "$1" .id .name .login.username | IFS=$'\t' read -r uuid val
+  if [[ -t 0 ]]; then
+    vared -p "Edit name > " val
+  else
+    val=$(</dev/stdin)
+  fi
+  bw_edit_item -f .name -i $uuid <<< "$val"
 }
 
 bw_edit_username() {
   if ! bw_unlock; then
     return 1
   fi
-  local uuid=$(bw_search -c Occ -s "$*" .id .name .login.username)
-  local fval=$(bw get item $uuid | jq -r '.login.username')
-  vared -p "Edit username > " fval
-  bw_edit_item -f .login.username -i $uuid <<< $fval
+  local uuid val
+  bw_search -c Oco -s "$1" .id .name .login.username | IFS=$'\t' read -r uuid val
+  if [[ -t 0 ]]; then
+    vared -p "Edit username > " val
+  else
+    val=$(</dev/stdin)
+  fi
+  bw_edit_item -f .login.username -i $uuid <<< "$val"
 }
 
 bw_edit_password() {
   if ! bw_unlock; then
     return 1
   fi
-  local uuid=$(bw_search -c Occ -s "$*" .id .name .login.username)
-  local fval=$(bw get item $uuid | jq -r '.login.password')
+  local uuid val
+  bw_search -c OccO -s "$1" .id .name .login.username .login.password | IFS=$'\t' read -r uuid val
   bw_edit_item -f .login.password -i $uuid
-  echo $fval
 }
 
 bw_edit_notes() {
   if ! bw_unlock; then
     return 1
   fi
-  local uuid=$(bw_search -c Occ -s "$*" .id .name .notes)
-  local fval=$(bw get item $uuid | jq -r '.notes')
-  bw_edit_item -f .notes -i $uuid
-  echo $fval
+  local uuid val
+  bw_search -c Oco -s "$1" .id .name .notes | IFS=$'\t' read -r uuid val
+  if [[ -t 0 ]]; then
+    vared -p $'Edit note |\n-----------\n' val
+  else
+    val=$(</dev/stdin)
+  fi
+  bw_edit_item -f .notes -i $uuid <<< "$val"
 }
 
 bw_create_login() {
   if ! bw_unlock; then
     return 1
   fi
-  local name username password
+  local name username uuid
   if [[ "$#" -lt 1 ]]; then
     vared -p "Login item name > " name
   else
@@ -346,35 +364,40 @@ bw_create_login() {
   else
     username="$2"
   fi
-  uuid=$(bw get template item \
-  | jq ".name=\"${name}\" | .login={\"username\":\"${username}\"}" \
-  | bw encode | bw create item | jq -r '.id')
+  local pass
   if [ -t 0 ] ; then
-    { bwg | bwpwe $uuid > /dev/null; }
-    echo "Created item $uuid. To change password use"
-    echo "bwpwe $uuid"
+    pass="$(bwg)"
   else
-    { bwpwe $uuid > /dev/null; }
+    pass="$(</dev/stdin)"
   fi
+  bw get template item \
+    | jq ".name=\"${name}\" | .login={\"username\":\"${username}\", \"password\": \"$pass\"}" \
+    | bw encode | bw create item | jq -r '.login.password'
 }
 
 bw_create_note() {
   if ! bw_unlock; then
     return 1
   fi
-  local name
+  local name val uuid
   if [[ "$#" -lt 1 ]]; then
     vared -p "Note item name > " name
   else
     name="$1"
   fi
+  if [[ -t 0 ]]; then
+    vared -p $'Enter note |\n-----------\n' val
+  else
+    val=$(</dev/stdin)
+  fi
   uuid=$(bw get template item \
-           | jq ".name=\"${name}\"" \
+           | jq ".name=\"${name}\" | .notes=\"${val}\" | .type=2 | .secureNote.type = 0" \
            | bw encode | bw create item | jq -r '.id')
 }
 
 alias bwul='bw_unlock'
 alias bwse='bw_unlock && bw_search'
+alias bwn='bw_name'
 alias bwus='bw_username'
 alias bwpw='bw_password'
 alias bwno='bw_notes'
@@ -385,7 +408,7 @@ alias bwuse='bw_edit_username'
 alias bwpwe='bw_edit_password'
 alias bwnoe='bw_edit_notes'
 alias bwfle='bw_edit_field'
-alias bwg='bw generate -ulns --length 20'
-alias bwgs='bw generate -uln --length 20'
+alias bwg='bw generate -ulns --length 21'
+alias bwgs='bw generate -uln --length 21'
 alias bwlc='bw_create_login'
-alias bwln='bw_create_note'
+alias bwnc='bw_create_note'
