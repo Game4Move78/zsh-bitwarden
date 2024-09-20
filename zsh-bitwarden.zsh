@@ -202,7 +202,7 @@ EOF
   local items=$(bw list items --search "$search" 2>/dev/null)
 
   if [ $? -ne 0 ] || [ -z "$items" ] || [ $(jq '. | length' <<< "$items") -eq 0 ]; then
-    echo "No results found. Try '-s .' to search all items." >&2
+    echo "No results found. Try '' to search all items." >&2
     return 4
   fi
 
@@ -268,7 +268,6 @@ bw_field() {
 
 bw_edit_item() {
   local field
-  local hidden=false
   while getopts ":f:i:" o; do
     case $o in
       i)
@@ -290,11 +289,15 @@ bw_edit_field() {
   if ! bw_unlock; then
     return 1
   fi
-  local path_val=".fields[]? | select(.name == \"$2\") | .value"
-  local path_idx=".fields | map(.name) | index(\"$2\")"
+  local path_val=".fields[] | select(.name == \"$1\") | .value"
+  local path_idx=".fields | map(.name) | index(\"$1\")"
   local uuid val idx
-  bw_search -c OcoO -s "$1" .id .name "$path_val" "$path_idx" | IFS=$'\t' read -r uuid val idx
-  vared -p "Edit $2 > " val
+  bw_search -c OcoO -s "$2" .id .name "$path_val" "$path_idx" | IFS=$'\t' read -r uuid val idx
+  if [[ "$?" -ne 0 ]]; then
+    echo "Couldn't find field $1 with search string $2"
+    return 1
+  fi
+  vared -p "Edit $1 > " val
   bw_edit_item -f ".fields[$idx].value" -i "$uuid" <<< "$val"
 }
 
