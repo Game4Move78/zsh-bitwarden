@@ -162,9 +162,6 @@ EOF
   # Ensure the number of colopts matches the number of paths
   if [ ${#colopts} -ne $# ]; then
     echo "Error: The number of column options (${#colopts}) does not match the number of JQ paths ($#)." >&2
-    for arg in "$@"; do
-      echo "ARG: $arg"
-    done
     return 1
   fi
 
@@ -208,10 +205,18 @@ EOF
   fi
 
   # Use _bw_table to create TSV, pipe it through _bw_select to fzf, then cut the output fields
-  _bw_table "$@" <<< "$items" \
+  { _bw_table "$@" <<< "$items" \
     | _bw_select "${visible[@]}" \
     | cut -f$(IFS=, ; echo "${out[*]}") \
-    | sed -z '$ s/\n$//'
+    | sed -z '$ s/\n$//' } 2>/dev/null
+
+  local codes=("${pipestatus[@]}")
+
+  for i in "${codes[@]}"; do
+    if [[ $i -ne 0 ]]; then
+      return $i
+    fi
+  done
 
 }
 
@@ -292,12 +297,13 @@ bw_edit_field() {
   fi
   local path_val=".fields[] | select(.name == \"$1\") | .value"
   local path_idx=".fields | map(.name) | index(\"$1\")"
-  local uuid val idx
-  bw_search -c OcoO -s "$2" .id .name "$path_val" "$path_idx" | IFS=$'\t' read -r uuid val idx
-  if [[ "$?" -ne 0 ]]; then
+  local uuid val idx res
+  res=$(bw_search -c OcoO -s "$2" .id .name "$path_val" "$path_idx")
+  if [[ $? -ne 0 ]]; then
     echo "Couldn't find field $1 with search string $2"
     return 1
   fi
+  IFS=$'\t' read -r uuid val idx <<< "$res"
   vared -p "Edit $1 > " val
   bw_edit_item -f ".fields[$idx].value" -i "$uuid" <<< "$val"
 }
@@ -306,8 +312,13 @@ bw_edit_name() {
   if ! bw_unlock; then
     return 1
   fi
-  local uuid val
-  bw_search -c Ooc -s "$1" .id .name .login.username | IFS=$'\t' read -r uuid val
+  local uuid val res
+  res=$(bw_search -c Ooc -s "$1" .id .name .login.username)
+  if [[ $? -ne 0 ]]; then
+    echo "Couldn't find items with search string $1"
+    return 1
+  fi
+  IFS=$'\t' read -r uuid val <<< "$res"
   if [[ -t 0 ]]; then
     vared -p "Edit name > " val
   else
@@ -320,8 +331,13 @@ bw_edit_username() {
   if ! bw_unlock; then
     return 1
   fi
-  local uuid val
-  bw_search -c Oco -s "$1" .id .name .login.username | IFS=$'\t' read -r uuid val
+  local uuid val res
+  res=$(bw_search -c Oco -s "$1" .id .name .login.username)
+  if [[ $? -ne 0 ]]; then
+    echo "Couldn't find items with search string $1"
+    return 1
+  fi
+  IFS=$'\t' read -r uuid val <<< "$res"
   if [[ -t 0 ]]; then
     vared -p "Edit username > " val
   else
@@ -334,8 +350,13 @@ bw_edit_password() {
   if ! bw_unlock; then
     return 1
   fi
-  local uuid val
-  bw_search -c OccO -s "$1" .id .name .login.username .login.password | IFS=$'\t' read -r uuid val
+  local uuid val res
+  res=$(bw_search -c OccO -s "$1" .id .name .login.username .login.password)
+  if [[ $? -ne 0 ]]; then
+    echo "Couldn't find items with search string $1"
+    return 1
+  fi
+  IFS=$'\t' read -r uuid val <<< "$res"
   bw_edit_item -f .login.password -i $uuid
 }
 
@@ -343,8 +364,9 @@ bw_edit_notes() {
   if ! bw_unlock; then
     return 1
   fi
-  local uuid val
-  bw_search -c Oco -s "$1" .id .name .notes | IFS=$'\t' read -r uuid val
+  local uuid val res
+  res=$(bw_search -c Oco -s "$1" .id .name .notes)
+  IFS=$'\t' read -r uuid val <<< "$res"
   if [[ -t 0 ]]; then
     vared -p $'Edit note |\n-----------\n' val
   else
