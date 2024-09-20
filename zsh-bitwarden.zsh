@@ -57,6 +57,7 @@ _bw_table() {
   local jq_output=$(jq -e ".[] | [$keys] | select(all(.[]; . != null) and length == $width)" <<< "$json" 2> /dev/null | jq -r "@tsv")
 
   if [[ -z "$jq_output" ]]; then
+    echo "Error: No results." >&2
     return 1
   fi
 
