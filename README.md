@@ -52,7 +52,7 @@ echo newvalue | bwfle -s mynewlogin -f myfield -r
 bwul && bwls gmail | bwse cco .name .login.username '.[] | .fields | length' 
 ```
 
-`bwul` unlocks the vault. `bwls gmail` searches for "gmail" and returns matching items. With `bse` each character in the first argument (`cco`) corresponds to the subsequent arguments. The use of `cc` causes the name and username of each item is displayed in `fzf`. The use of `o` causes the number of fields to be displayed in `fzf`, and be printed to output when selected.
+`bwul` unlocks the vault. `bwls gmail` searches for "gmail" and returns matching items. With `bse` each character in the first argument (`cco`) corresponds to the subsequent arguments. The use of `cc` causes the name and username of each item to be displayed in `fzf`. The use of `o` causes the number of fields to be displayed in `fzf`, and be printed to output when selected.
 
 | Character | Visible in fzf | Printed to output |
 |-----------|----------------|-------------------|
