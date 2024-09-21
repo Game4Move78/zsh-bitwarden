@@ -8,26 +8,26 @@ See [INSTALL.md](INSTALL.md).
 
 ## Usage
 
-| Command                    | Description                                                    |
-|----------------------------|----------------------------------------------------------------|
-| `bwul`                     | to unlock the vault, setting the env variable $BW_SESSION.     |
-| `bwg`                      | to generate a complex password (alphanumeric + special)        |
-| `bwgs`                     | to generate a simple password (alphanumeric)                   |
-| `bwus`                     | to get a username                                              |
-| `bwuse`                    | to edit a username                                             |
-| `bwpw`                     | to get a password                                              |
-| `bwpwe`                    | to edit a password                                             |
-| `bwfl`                     | to get a field                                                 |
-| `bwfle`                    | to edit a field                                                |
-| `bwfle -r`                 | to rename a field                                              |
-| `bwfle -d`                 | to delete a field                                              |
-| `bwfla`                    | to add a field                                                 |
-| `bwno`                     | to get notes                                                   |
-| `bwnoe`                    | to edit notes                                                  |
-| `bwne`                     | to edit an item name                                           |
-| `bwup`                     | to copy username then password to clipboard                    |
-| `bwlc -n NAME -u USERNAME` | to create a login and save the generated password to clipboard |
-| `bwnc -n NAME -u USERNAME` | to create a login and save the generated password to clipboard |
+| Command                    | Description                                                 |
+|----------------------------|-------------------------------------------------------------|
+| `bwul`                     | unlock the vault, setting the env variable $BW_SESSION.     |
+| `bwg`                      | generate a complex password (alphanumeric + special)        |
+| `bwgs`                     | generate a simple password (alphanumeric)                   |
+| `bwus`                     | get a username                                              |
+| `bwuse`                    | edit a username                                             |
+| `bwpw`                     | get a password                                              |
+| `bwpwe`                    | edit a password                                             |
+| `bwfl`                     | get a field                                                 |
+| `bwfle`                    | edit a field                                                |
+| `bwfle -r`                 | rename a field                                              |
+| `bwfle -d`                 | delete a field                                              |
+| `bwfla`                    | add a field                                                 |
+| `bwno`                     | get notes                                                   |
+| `bwnoe`                    | edit notes                                                  |
+| `bwne`                     | edit an item name                                           |
+| `bwup`                     | copy username then password to clipboard                    |
+| `bwlc -n NAME -u USERNAME` | to create a login and save the generated password clipboard |
+| `bwnc -n NAME -u USERNAME` | to create a login and save the generated password clipboard |
 
 ## Examples
 
