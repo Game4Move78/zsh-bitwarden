@@ -549,7 +549,7 @@ bw_create_note() {
 alias bwls='bw_list'
 alias bwtbl='bw_table'
 alias bwul='bw_unlock'
-alias bwse='bw_unlock && bw_search'
+alias bwse='bw_search'
 alias bwn='bw_name'
 alias bwus='bw_username'
 alias bwpw='bw_password'
