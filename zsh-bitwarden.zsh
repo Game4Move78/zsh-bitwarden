@@ -547,6 +547,7 @@ bw_create_note() {
 }
 
 alias bwls='bw_list'
+alias bwgf='bw_group_fields'
 alias bwtbl='bw_table'
 alias bwul='bw_unlock'
 alias bwse='bw_search'

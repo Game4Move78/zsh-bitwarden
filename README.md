@@ -66,13 +66,20 @@ local fieldpath="[.fields[] | select(.name == \"$fieldname\") | .value] | first"
 bwul && (bwls wikipedia | bwse co .name "$fieldpath" | clipcopy)
 ```
 
-By using the JQ path `$fieldpath` that selects the field named "email", this example lets you
-copy one of the emails associated with the search string `wikipedia`.
+By using the JQ path `$fieldpath` that selects the field named "email", this example lets you copy one of the emails associated with the search string `wikipedia`. Any item not containing this field will not be displayed.
 
 ```zsh
 local fieldname="email"
-local fieldpath="[.fields[] | select(.name == \"$fieldname\") | .value] | first"
-bwul && (bwls wikipedia | bwtbl .name "$fieldpath")
+local fieldpath=".fields.value | select(.name == \"$fieldname\") | .value"
+bwul && (bwls wikipedia | bwgf | bwse co .name "$fieldpath" | clipcopy)
+```
+
+Equivalent code but using group by field rather than selecting the first matching (in case of duplicates)
+
+```zsh
+local fieldname="email"
+local fieldpath=".fields.value | select(.name == \"$fieldname\") | .value"
+bwul && (bwls wikipedia | bwgf | bwtbl .name "$fieldpath")
 ```
 
 This example is the same, but instead of fzf selection, it displays all results in a TSV table.
