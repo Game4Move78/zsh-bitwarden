@@ -31,7 +31,7 @@ See [INSTALL.md](INSTALL.md).
 
 ## Examples
 
-```
+```zsh
 # create entry called `mylogin` with username `user123@example.com` and copy secure password to clipboard
 bwlc -n mylogin -u user123@example.com | clipcopy'
 # rename to mynewlogin
@@ -48,7 +48,7 @@ echo newvalue | bwfle -s mynewlogin -f myfield -r
 
 ## bwse example
 
-```
+```zsh
 bwul && bwls gmail | bwse cco .name .login.username '.[] | .fields | length' 
 ```
 
