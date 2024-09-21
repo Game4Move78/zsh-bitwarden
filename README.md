@@ -47,15 +47,6 @@ bwfl -s mynewlogin -f myfield | clipcopy
 echo newvalue | bwfle -s mynewlogin -f myfield -r
 ```
 
-## Notes
-
-COLS    Each character in COL specifies an option for corresponding column:
-- 'c' = visible column, but not in the output.
-- 'o' = visible and output column.
-- 'O' = hidden but output column.
-
-`bwls` lists items as a JSON array. Pipe the output to `bwse` to return the values at JQ paths. If multiple items are present, the user is prompted to select one interactively using `fzf`. The first argument configures which columns are visible in `fzf` and which are printed in tsv output. The remaining arguments correspond to jq paths, which should be equal to the number of fields. If one row is present it is printed without interactive selection.
-
 ## bwse example
 
 ```
