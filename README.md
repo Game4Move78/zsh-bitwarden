@@ -28,7 +28,6 @@ See [INSTALL.md](INSTALL.md).
 | `bwup`                     | to copy username then password to clipboard                    |
 | `bwlc -n NAME -u USERNAME` | to create a login and save the generated password to clipboard |
 | `bwnc -n NAME -u USERNAME` | to create a login and save the generated password to clipboard |
-|----------------------------|----------------------------------------------------------------|
 
 ## Examples
 
@@ -55,13 +54,11 @@ bwul && bwls gmail | bwse cco .name .login.username '.[] | .fields | length'
 
 `bwul` unlocks the vault. `bwls gmail` searches for "gmail" and returns matching items. With `bse` each character in the first argument (`coc`) corresponds to the subsequent arguments. The use of `c` the first two paths means the name and username of each item is displayed in `fzf`. The use of `o` causes the number of fields to be displayed in `fzf`, and be printed to output when selected.
 
-|-----------|----------------|-------------------|
 | Character | Visible in fzf | Printed to output |
 |-----------|----------------|-------------------|
 | c         | yes            | no                |
 | o         | yes            | yes               |
 | O         | no             | yes               |
-|-----------|----------------|-------------------|
 
 ## Notes
 
