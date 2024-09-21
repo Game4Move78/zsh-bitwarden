@@ -8,26 +8,26 @@ See [INSTALL.md](INSTALL.md).
 
 ## Usage
 
-| Command    | Description                                      |
-|------------|--------------------------------------------------|
-| `bwul`     | unlock the vault, setting the env variable       |
-| `bwg`      | generate a complex password (alphanum + special) |
-| `bwgs`     | generate a simple password (alphanum)            |
-| `bwus`     | get a username                                   |
-| `bwuse`    | edit a username                                  |
-| `bwpw`     | get a password                                   |
-| `bwpwe`    | edit a password                                  |
-| `bwfl`     | get a field                                      |
-| `bwfle`    | edit a field                                     |
-| `bwfle -r` | rename a field                                   |
-| `bwfle -d` | delete a field                                   |
-| `bwfla`    | add a field                                      |
-| `bwno`     | get notes                                        |
-| `bwnoe`    | edit notes                                       |
-| `bwne`     | edit an item name                                |
-| `bwup`     | copy username then password to clipboard         |
-| `bwlc`     | create a login                                   |
-| `bwnc`     | create a login                                   |
+| Command    | Description                 |
+|------------|-----------------------------|
+| `bwul`     | unlock the vault            |
+| `bwg`      | alphanum + special password |
+| `bwgs`     | alphanum password           |
+| `bwus`     | get username                |
+| `bwuse`    | edit username               |
+| `bwpw`     | get password                |
+| `bwpwe`    | edit password               |
+| `bwfl`     | get field                   |
+| `bwfle`    | edit field                  |
+| `bwfle -r` | rename field                |
+| `bwfle -d` | delete field                |
+| `bwfla`    | add field                   |
+| `bwno`     | get note                    |
+| `bwnoe`    | edit note                   |
+| `bwne`     | edit item name              |
+| `bwup`     | copy username then password |
+| `bwlc`     | create login                |
+| `bwnc`     | create note                 |
 
 ## Examples
 
