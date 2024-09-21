@@ -46,19 +46,36 @@ bwfl -s mynewlogin -f myfield | clipcopy
 echo newvalue | bwfle -s mynewlogin -f myfield -r
 ```
 
-## bwse example
+## bwse examples
 
 ```zsh
-bwul && bwls gmail | bwse cco .name .login.username '.[] | .fields | length' 
+bwul && bwls gmail | bwse cco .name .login.username '.[] | .fields | length' | clipcopy
 ```
 
-`bwul` unlocks the vault. `bwls gmail` searches for "gmail" and returns matching items. With `bse` each character in the first argument (`cco`) corresponds to the subsequent arguments. The use of `cc` causes the name and username of each item to be displayed in `fzf`. The use of `o` causes the number of fields to be displayed in `fzf`, and be printed to output when selected.
+`bwul` unlocks the vault. `bwls gmail` searches for "gmail" and returns matching items. With `bse` each character in the first argument (`cco`) corresponds to the subsequent arguments. The use of `cc` along with `.name` and `.login.username` causes the name and username of each item to be displayed in `fzf`. The use of `o` along with `'.[] | .fields | length'` causes the number of fields to be displayed in `fzf`, and be printed to output when selected.
 
 | Character | Visible in fzf | Printed to output |
 |-----------|----------------|-------------------|
 | c         | yes            | no                |
 | o         | yes            | yes               |
 | O         | no             | yes               |
+
+```zsh
+local fieldname="email"
+local fieldpath="[.fields[] | select(.name == \"$fieldname\") | .value] | first"
+bwul && (bwls wikipedia | bwse co .name "$fieldpath" | clipcopy)
+```
+
+By using the JQ path `$fieldpath` that selects the field named "email", this example lets you
+copy one of the emails associated with the search string `wikipedia`.
+
+```zsh
+local fieldname="email"
+local fieldpath="[.fields[] | select(.name == \"$fieldname\") | .value] | first"
+bwul && (bwls wikipedia | bwtbl .name "$fieldpath")
+```
+
+This example is the same, but instead of fzf selection, it displays all results in a TSV table.
 
 ## Notes
 
