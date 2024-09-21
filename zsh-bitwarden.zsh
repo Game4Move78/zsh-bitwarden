@@ -40,7 +40,7 @@ _bw_test_subshell() {
 }
 
 # Takes JSON as stdin and jq paths to extract into tsv as args
-_bw_table() {
+bw_table() {
   if [[ "$#" == 0 ]]; then
     echo "Usage: $0 [PATH]..."
     return 1
@@ -54,7 +54,7 @@ _bw_table() {
   done
 
   # Construct tsv with values selected using args
-  local jq_output=$(jq -e ".[] | [$keys] | select(all(.[]; . != null) and length == $width)" <<< "$json" 2> /dev/null | jq -r "@tsv")
+  local jq_output=$(jq -ceM ".[] | [$keys] | select(all(.[]; . != null) and length == $width)" <<< "$json" 2> /dev/null | jq -r "@tsv")
 
   if [[ -z "$jq_output" ]]; then
     echo "Error: No results." >&2
@@ -73,6 +73,7 @@ _bw_table() {
 
 # Takes tsv as stdin and columns to show in fzf as args
 _bw_select() {
+
   if [[ "$#" == 0 ]]; then
     echo "Usage: $0 [COLUMN INDEX]..."
     return 1
@@ -99,7 +100,7 @@ _bw_select() {
     return 1
   fi
 
-  local row=$(fzf -d $'\t' --with-nth 2 --select-1 --header-lines=1 <<< "$tbl"\
+  local row=$(fzf -d $'\t' --with-nth=2 --select-1 --header-lines=1 <<< "$tbl"\
     | awk '{print $1}')
 
   if [[ "$?" -ne 0 || -z "$row" ]]; then
@@ -115,43 +116,10 @@ bw_search() {
   local columns=()
   local visible=()
   local out=()
-  local o search colopts
+  local o search
 
-  while getopts ":c:s::h" o; do
-    case $o in
-      h) # Help message
-        cat <<EOF
-Usage: $0 [options] JQPATHS
-
-Constructs TSV from Bitwarden search items and allows selection with fzf if multiple are found.
-
-Options:
-  -c COLS    Each character in COL specifies an option for corresponding column:
-               'c' = visible column, but not in the output.
-               'o' = visible and output column.
-               'O' = hidden but output column.
-  -s SEARCH  Search string passed to 'bw list items --search'.
-  -h         Display this help and exit.
-
-Examples:
-  $0 -c ccOo -s github .name .login.username .login.password .notes
-  $0 -c co -s github .name .login.username | clipcopy
-EOF
-        return 0
-        ;;
-      s) # Search string
-        search=$OPTARG
-        ;;
-      c) # Column options
-        colopts=$OPTARG
-        ;;
-      *) # Invalid option
-        echo "Invalid option: -$OPTARG" >&2
-        return 1
-        ;;
-    esac
-  done
-  shift $(($OPTIND - 1))
+  local colopts=$1
+  local -a jqpaths=("${@:2}")
 
   # Validate remaining arguments (JQ paths)
   if [ $# -lt 1 ]; then
@@ -160,8 +128,8 @@ EOF
   fi
 
   # Ensure the number of colopts matches the number of paths
-  if [ ${#colopts} -ne $# ]; then
-    echo "Error: The number of column options (${#colopts}) does not match the number of JQ paths ($#)." >&2
+  if [ ${#colopts} -ne $(($# - 1)) ]; then
+    echo "Error: The number of column options (${#colopts}) does not match the number of JQ paths ($# - 1)." >&2
     return 1
   fi
 
@@ -197,26 +165,30 @@ EOF
   fi
 
   # Search using bitwarden
-  local items=$(bw list items --search "$search" 2>/dev/null)
+  local items=$(</dev/stdin)
 
   if [ $? -ne 0 ] || [ -z "$items" ] || [ $(jq '. | length' <<< "$items") -eq 0 ]; then
     echo "No results found. Try '' to search all items." >&2
     return 4
   fi
 
-  # Use _bw_table to create TSV, pipe it through _bw_select to fzf, then cut the output fields
-  { _bw_table "$@" <<< "$items" \
-    | _bw_select "${visible[@]}" \
-    | cut -f$(IFS=, ; echo "${out[*]}") \
-    | sed -z '$ s/\n$//' } 2>/dev/null
+  local tsv=$(bw_table "${jqpaths[@]}" <<< "$items")
 
-  local codes=("${pipestatus[@]}")
+  if [ $? -ne 0 ]; then
+    echo "Failed to construct tsv" >&2
+    return 4
+  fi
 
-  for i in "${codes[@]}"; do
-    if [[ $i -ne 0 ]]; then
-      return $i
-    fi
-  done
+  local row=$(_bw_select "${visible[@]}" <<< "$tsv")
+
+  if [ $? -ne 0 ]; then
+    echo "Failed to select row" >&2
+    return 4
+  fi
+
+  local comma_out=$(IFS=, ; echo "${out[*]}")
+
+  cut -f"$comma_out" <<< "$row" | sed -z '$ s/\n$//'
 
 }
 
@@ -237,10 +209,13 @@ bw_unlock() {
 }
 
 bw_user_pass() {
+  local -a sarg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg || return
   if ! bw_unlock; then
     return 1
   fi
-  local userpass=$(bw_search -c coO -s "$1" .name .login.username .login.password)
+  local userpass=$(bw_list "${sarg[-1]}" | bw_search coO .name .login.username .login.password)
   if [[ "$?" -ne 0 ]]; then
     return 2
   fi
@@ -250,72 +225,189 @@ bw_user_pass() {
   read _ && cut -f 2 <<< $userpass | clipcopy
 }
 
+bw_list() {
+  bw list items --search "$1"
+}
+
 bw_name() {
-  bw_unlock && bw_search -c oc -s "$1" .name .login.username
+  local -a sarg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg || return
+  bw_unlock && bw_list "${sarg[-1]}" | bw_search oc .name .login.username
 }
 
 bw_username() {
-  bw_unlock && bw_search -c co -s "$1" .name .login.username
+  local -a sarg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg || return
+  bw_unlock && bw_list "${sarg[-1]}" | bw_search co .name .login.username
 }
 
 bw_password() {
-  bw_unlock && bw_search -c ccO -s "$1" .name .login.username .login.password
+  local -a sarg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg || return
+  bw_unlock && bw_list "${sarg[-1]}" | bw_search ccO .name .login.username .login.password
 }
 
 bw_notes() {
-  bw_unlock && bw_search -c co -s "$1" .name .notes
+  local -a sarg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg || return
+  bw_unlock && bw_list "${sarg[-1]}" | bw_search co .name .notes
+}
+
+bw_select_values() {
+  jq -rceM "[.[] | $1] | unique | .[]" \
+    | fzf --header="$2" --print-query \
+    | awk 'NR == 1 && $0 != "" { print $0; exit } NR == 2 { print $0; exit }'
+}
+
+bw_select_field() {
+  bw_select_values '.fields[]?.name?' "field"
+}
+
+bw_group_fields() {
+  jq -ceM '[.[] | . as $item | .fields? | to_entries? | .[] as $field | $item | .fields=$field]'
 }
 
 bw_field() {
-  local fieldpath=".fields[]? | select(.name == \"$1\") | .value"
 
-  bw_unlock && bw_search -c co -s "$2" .name "$fieldpath"
+  local -a sarg farg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg \
+             {f,-field}:=farg || return
+
+  if ! bw_unlock; then
+    return 1
+  fi
+
+  local items=$(bw_list "${sarg[-1]}" | bw_group_fields)
+
+  local name
+  if (( $#farg)); then
+    name="${farg[-1]}"
+  else
+    name=$(bw_select_field <<< "$items")
+  fi
+
+  #local fieldpath="[.fields[] | select(.name == \"$name\") | .value] | first"
+  local fieldpath=".fields.value | select(.name == \"$name\") | .value"
+
+  bw_search co .name "$fieldpath" <<< "$items"
+}
+
+bw_get_item() {
+  jq -ceM ".[] | select(.id == \"$1\")"
 }
 
 bw_edit_item() {
-  local field
-  while getopts ":f:i:" o; do
-    case $o in
-      i)
-        uuid=$OPTARG
-        ;;
-      f)
-        field=$OPTARG
-        ;;
-    esac
-  done
+  jq -ceM "$2" | bw encode | bw edit item "$1" > /dev/null
+}
 
-  local item=$(bw get item $uuid)
-  local fnew=$(</dev/stdin)
+bw_edit_item_assign() {
 
-  jq "$field=\"$fnew\"" <<< $item | bw encode | bw edit item $uuid > /dev/null
+  bw_edit_item "$1" "$2 = \"$3\""
+
+}
+
+bw_edit_item_append() {
+
+  bw_edit_item "$1" "$2 += [$3]"
+
 }
 
 bw_edit_field() {
+
+  local -a sarg farg rarg darg
+  zparseopts -D -F -K -- \
+             {r,-rename}=rarg \
+             {d,-delete}=darg \
+             {s,-search}:=sarg \
+             {f,-field}:=farg || return
+
   if ! bw_unlock; then
     return 1
   fi
-  local path_val=".fields[] | select(.name == \"$1\") | .value"
-  local path_idx=".fields | map(.name) | index(\"$1\")"
+  local items=$(bw_list "${sarg[-1]}")
+  local grp_items=$(bw_group_fields <<< "$items")
+  local name
+  if (( $#farg)); then
+    name="${farg[-1]}"
+  else
+    name=$(bw_select_field <<< "$items")
+  fi
+  #local path_val="[.fields[] | select(.name == \"$name\") | .value] | first"
+  #local path_idx=".fields | map(.name) | index(\"$name\")"
+  local path_val=".fields.value | select(.name == \"$name\") | .value"
+  local path_idx=".fields.key"
   local uuid val idx res
-  res=$(bw_search -c OcoO -s "$2" .id .name "$path_val" "$path_idx")
+  res=$(bw_search OcoO .id .name "$path_val" "$path_idx" <<< "$grp_items")
   if [[ $? -ne 0 ]]; then
-    echo "Couldn't find field $1 with search string $2"
+    echo "Couldn't find field $name with search string ${sarg[-1]}"
     return 1
   fi
   IFS=$'\t' read -r uuid val idx <<< "$res"
-  vared -p "Edit $1 > " val
-  bw_edit_item -f ".fields[$idx].value" -i "$uuid" <<< "$val"
+  if (( $#darg)); then
+    bw_get_item "$uuid" <<< "$items" | bw_edit_item "$uuid" "del(.fields[$idx])"
+    return
+  fi
+  if [[ -t 0 ]]; then
+    if (( $#rarg)); then
+      vared -p "Edit $name > " name
+    else
+      vared -p "Edit $name > " val
+    fi
+  else
+    val=$(</dev/stdin)
+  fi
+  bw_get_item "$uuid" <<< "$items" | bw_edit_item "$uuid" ".fields[$idx].name=\"$name\" | .fields[$idx].value=\"$val\""
 }
 
-bw_edit_name() {
+bw_add_field() {
+
+  local -a sarg farg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg \
+             {f,-field}:=farg || return
   if ! bw_unlock; then
     return 1
   fi
-  local uuid val res
-  res=$(bw_search -c Ooc -s "$1" .id .name .login.username)
+  local items=$(bw_list "${sarg[-1]}")
+  local name val
+  if (( $#farg)); then
+    name="${farg[-1]}"
+  else
+    name=$(bw_select_field <<< "$items")
+  fi
+  local path_val="[(.fields[] | select(.name == \"$name\") | .value) // \"\"] | first"
+  local res=$(bw_search Oco .id .name "$path_val" <<< "$items")
   if [[ $? -ne 0 ]]; then
-    echo "Couldn't find items with search string $1"
+    echo "Couldn't find items with search string ${sarg[-1]}"
+    return 1
+  fi
+  IFS=$'\t' read -r uuid val <<< "$res"
+  if [[ -t 0 ]]; then
+    vared -p "Field value > " val
+  else
+    val=$(</dev/stdin)
+  fi
+  local field_json="{\"name\": \"$name\", \"value\": \"$val\"}"
+  bw_get_item "$uuid" <<< "$items" | bw_edit_item_append "$uuid" ".fields" "$field_json"
+}
+
+bw_edit_name() {
+  local -a sarg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg || return
+  if ! bw_unlock; then
+    return 1
+  fi
+  local items=$(bw_list "${sarg[-1]}")
+  local uuid val res
+  res=$(bw_search Ooc .id .name .login.username)
+  if [[ $? -ne 0 ]]; then
+    echo "Couldn't find items with search string ${sarg[-1]}"
     return 1
   fi
   IFS=$'\t' read -r uuid val <<< "$res"
@@ -324,15 +416,22 @@ bw_edit_name() {
   else
     val=$(</dev/stdin)
   fi
-  bw_edit_item -f .name -i $uuid <<< "$val"
+  bw_edit_item_assign "$uuid" ".name" "$val"
+}
+
+bw_filter_type() {
+  jq -ceM "[.[] | select(.type == $1)]"
 }
 
 bw_edit_username() {
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg || return
   if ! bw_unlock; then
     return 1
   fi
+  local items=$(bw_list "${sarg[-1]}" | bw_filter_type 1)
   local uuid val res
-  res=$(bw_search -c Oco -s "$1" .id .name .login.username)
+  res=$(bw_search Oco .id .name .login.username <<< "$items")
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search string $1"
     return 1
@@ -343,56 +442,76 @@ bw_edit_username() {
   else
     val=$(</dev/stdin)
   fi
-  bw_edit_item -f .login.username -i $uuid <<< "$val"
+  bw_edit_item_assign "$uuid" .login.username "$val"
 }
 
 bw_edit_password() {
+  local -a sarg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg || return
   if ! bw_unlock; then
     return 1
   fi
+  local items=$(bw_list "${sarg[-1]}" | bw_filter_type 1)
   local uuid val res
-  res=$(bw_search -c OccO -s "$1" .id .name .login.username .login.password)
+  res=$(bw_search OccO .id .name .login.username .login.password <<< "$items")
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search string $1"
     return 1
   fi
   IFS=$'\t' read -r uuid val <<< "$res"
-  bw_edit_item -f .login.password -i $uuid
+  if [[ -t 0 ]]; then
+    vared -p "Edit password > " val
+  else
+    val=$(</dev/stdin)
+  fi
+  bw_edit_item_assign "$uuid" .login.password "$val"
 }
 
 bw_edit_notes() {
+  local -a sarg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg || return
   if ! bw_unlock; then
     return 1
   fi
+  local items=$(bw_list "${sarg[-1]}" | bw_filter_type 1)
   local uuid val res
-  res=$(bw_search -c Oco -s "$1" .id .name .notes)
+  res=$(bw_search Oco .id .name .notes)
   IFS=$'\t' read -r uuid val <<< "$res"
   if [[ -t 0 ]]; then
     vared -p $'Edit note |\n-----------\n' val
   else
     val=$(</dev/stdin)
   fi
-  bw_edit_item -f .notes -i $uuid <<< "$val"
+  bw_edit_item_assign "$uuid" .notes "$val"
 }
 
 bw_create_login() {
+
+  local -a sarg narg uarg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg \
+             {n,-name}:=narg \
+             {u,-username}:=uarg || return
+
   if ! bw_unlock; then
     return 1
   fi
   local name username uuid
-  if [[ "$#" -lt 1 ]]; then
+  if (( $#narg)); then
+    name="${narg[-1]}"
+  else
     vared -p "Login item name > " name
-  else
-    name="$1"
   fi
-  if [[ "$#" -lt 2 ]]; then
-    vared -p "Login item username > " username
+  if (( $#uarg)); then
+    username="${uarg[-1]}"
   else
-    username="$2"
+    vared -p "Login item username > " username
   fi
   local pass
   if [ -t 0 ] ; then
-    pass="$(bwg)"
+    pass="$(bw generate -ulns --length 21)"
   else
     pass="$(</dev/stdin)"
   fi
@@ -402,14 +521,20 @@ bw_create_login() {
 }
 
 bw_create_note() {
+
+  local -a sarg narg uarg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg \
+             {n,-name}:=narg || return
+
   if ! bw_unlock; then
     return 1
   fi
   local name val uuid
-  if [[ "$#" -lt 1 ]]; then
-    vared -p "Note item name > " name
+  if (( $#narg)); then
+    name="${narg[-1]}"
   else
-    name="$1"
+    vared -p "Note item name > " name
   fi
   if [[ -t 0 ]]; then
     vared -p $'Enter note |\n-----------\n' val
@@ -421,6 +546,8 @@ bw_create_note() {
            | bw encode | bw create item | jq -r '.id')
 }
 
+alias bwls='bw_list'
+alias bwtbl='bw_table'
 alias bwul='bw_unlock'
 alias bwse='bw_unlock && bw_search'
 alias bwn='bw_name'
@@ -428,13 +555,16 @@ alias bwus='bw_username'
 alias bwpw='bw_password'
 alias bwno='bw_notes'
 alias bwfl='bw_field'
+alias bwfl='bw_field'
+alias bwfl_='bw_field "$(bw_select_field)"'
 alias bwup='bw_user_pass'
 alias bwne='bw_edit_name'
 alias bwuse='bw_edit_username'
 alias bwpwe='bw_edit_password'
 alias bwnoe='bw_edit_notes'
 alias bwfle='bw_edit_field'
-alias bwg='bw generate -ulns --length 21'
-alias bwgs='bw generate -uln --length 21'
+alias bwfla='bw_add_field'
+alias bwg='bw_unlock && bw generate -ulns --length 21'
+alias bwgs='bw_unlock && bw generate -uln --length 21'
 alias bwlc='bw_create_login'
 alias bwnc='bw_create_note'
