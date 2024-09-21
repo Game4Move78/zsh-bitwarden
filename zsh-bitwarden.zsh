@@ -208,6 +208,29 @@ bw_unlock() {
   fi
 }
 
+bw_list() {
+  local -a sarg larg narg farg
+  zparseopts -D -F -K -- \
+             {s,-search}:=sarg \
+             {f,-fields}=farg \
+             {l,-login}=larg \
+             {n,-note}=narg || return
+  local items=$(bw list items --search "${sarg[-1]}")
+  if (( $#larg || $#narg)); then
+    local item_type
+    if (( $#larg)); then
+      item_type=1
+    elif (( $#narg )); then
+      item_type=2
+    fi
+    items=$(jq -ceM "[.[] | select(.type == $item_type)]" <<< "$items")
+  fi
+  if (( $#farg)); then
+    items=$(bw_group_fields <<< "$items")
+  fi
+  printf "%s" "$items"
+}
+
 bw_user_pass() {
   local -a sarg
   zparseopts -D -F -K -- \
@@ -215,7 +238,7 @@ bw_user_pass() {
   if ! bw_unlock; then
     return 1
   fi
-  local userpass=$(bw_list "${sarg[-1]}" | bw_search coO .name .login.username .login.password)
+  local userpass=$(bw_list -l -s "${sarg[-1]}" | bw_search coO .name .login.username .login.password)
   if [[ "$?" -ne 0 ]]; then
     return 2
   fi
@@ -225,36 +248,32 @@ bw_user_pass() {
   read _ && cut -f 2 <<< $userpass | clipcopy
 }
 
-bw_list() {
-  bw list items --search "$1"
-}
-
 bw_name() {
   local -a sarg
   zparseopts -D -F -K -- \
              {s,-search}:=sarg || return
-  bw_unlock && bw_list "${sarg[-1]}" | bw_search oc .name .login.username
+  bw_unlock && bw_list -s "${sarg[-1]}" | bw_search oc .name .login.username
 }
 
 bw_username() {
   local -a sarg
   zparseopts -D -F -K -- \
              {s,-search}:=sarg || return
-  bw_unlock && bw_list "${sarg[-1]}" | bw_search co .name .login.username
+  bw_unlock && bw_list -l -s "${sarg[-1]}" | bw_search co .name .login.username
 }
 
 bw_password() {
   local -a sarg
   zparseopts -D -F -K -- \
              {s,-search}:=sarg || return
-  bw_unlock && bw_list "${sarg[-1]}" | bw_search ccO .name .login.username .login.password
+  bw_unlock && bw_list -l -s "${sarg[-1]}" | bw_search ccO .name .login.username .login.password
 }
 
-bw_notes() {
+bw_note() {
   local -a sarg
   zparseopts -D -F -K -- \
              {s,-search}:=sarg || return
-  bw_unlock && bw_list "${sarg[-1]}" | bw_search co .name .notes
+  bw_unlock && bw_list -n -s "${sarg[-1]}" | bw_search co .name .notes
 }
 
 bw_select_values() {
@@ -282,7 +301,7 @@ bw_field() {
     return 1
   fi
 
-  local items=$(bw_list "${sarg[-1]}" | bw_group_fields)
+  local items=$(bw_list -s "${sarg[-1]}" | bw_group_fields)
 
   local name
   if (( $#farg)); then
@@ -329,7 +348,7 @@ bw_edit_field() {
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list "${sarg[-1]}")
+  local items=$(bw_list -s "${sarg[-1]}")
   local grp_items=$(bw_group_fields <<< "$items")
   local name
   if (( $#farg)); then
@@ -373,7 +392,7 @@ bw_add_field() {
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list "${sarg[-1]}")
+  local items=$(bw_list -s "${sarg[-1]}")
   local name val
   if (( $#farg)); then
     name="${farg[-1]}"
@@ -403,7 +422,7 @@ bw_edit_name() {
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list "${sarg[-1]}")
+  local items=$(bw_list -s "${sarg[-1]}")
   local uuid val res
   res=$(bw_search Ooc .id .name .login.username)
   if [[ $? -ne 0 ]]; then
@@ -420,7 +439,19 @@ bw_edit_name() {
 }
 
 bw_filter_type() {
-  jq -ceM "[.[] | select(.type == $1)]"
+  local -a larg narg
+  zparseopts -D -F -K -- \
+             {l,-login}=larg \
+             {n,-note}=narg || return
+  local item_type
+  if (( $#larg)); then
+    item_type=1
+  elif (( $#narg )); then
+    item_type=2
+  else
+    return 1
+  fi
+  jq -ceM "[.[] | select(.type == $item_type)]"
 }
 
 bw_edit_username() {
@@ -429,7 +460,7 @@ bw_edit_username() {
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list "${sarg[-1]}" | bw_filter_type 1)
+  local items=$(bw_list -l -s "${sarg[-1]}")
   local uuid val res
   res=$(bw_search Oco .id .name .login.username <<< "$items")
   if [[ $? -ne 0 ]]; then
@@ -452,7 +483,7 @@ bw_edit_password() {
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list "${sarg[-1]}" | bw_filter_type 1)
+  local items=$(bw_list -l -s "${sarg[-1]}")
   local uuid val res
   res=$(bw_search OccO .id .name .login.username .login.password <<< "$items")
   if [[ $? -ne 0 ]]; then
@@ -468,14 +499,14 @@ bw_edit_password() {
   bw_edit_item_assign "$uuid" .login.password "$val"
 }
 
-bw_edit_notes() {
+bw_edit_note() {
   local -a sarg
   zparseopts -D -F -K -- \
              {s,-search}:=sarg || return
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list "${sarg[-1]}" | bw_filter_type 1)
+  local items=$(bw_list -n -s "${sarg[-1]}")
   local uuid val res
   res=$(bw_search Oco .id .name .notes)
   IFS=$'\t' read -r uuid val <<< "$res"
@@ -554,14 +585,14 @@ alias bwse='bw_search'
 alias bwn='bw_name'
 alias bwus='bw_username'
 alias bwpw='bw_password'
-alias bwno='bw_notes'
+alias bwno='bw_note'
 alias bwfl='bw_field'
 alias bwfl='bw_field'
 alias bwup='bw_user_pass'
 alias bwne='bw_edit_name'
 alias bwuse='bw_edit_username'
 alias bwpwe='bw_edit_password'
-alias bwnoe='bw_edit_notes'
+alias bwnoe='bw_edit_note'
 alias bwfle='bw_edit_field'
 alias bwfla='bw_add_field'
 alias bwg='bw_unlock && bw generate -ulns --length 21'

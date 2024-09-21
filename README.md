@@ -49,10 +49,10 @@ echo newvalue | bwfle -s mynewlogin -f myfield -r
 ## bwse examples
 
 ```zsh
-bwul && bwls gmail | bwse cco .name .login.username '.[] | .fields | length' | clipcopy
+bwul && bwls -l -s gmail | bwse cco .name .login.username '.[] | .fields | length' | clipcopy
 ```
 
-`bwul` unlocks the vault. `bwls gmail` searches for "gmail" and returns matching items. With `bse` each character in the first argument (`cco`) corresponds to the subsequent arguments. The use of `cc` along with `.name` and `.login.username` causes the name and username of each item to be displayed in `fzf`. The use of `o` along with `'.[] | .fields | length'` causes the number of fields to be displayed in `fzf`, and be printed to output when selected.
+`bwul` unlocks the vault. `bwls -l -s gmail` searches for "gmail" and returns matching logins (`-l`). With `bse` each character in the first argument (`cco`) corresponds to the subsequent arguments. The use of `cc` along with `.name` and `.login.username` causes the name and username of each item to be displayed in `fzf`. The use of `o` along with `'.[] | .fields | length'` causes the number of fields to be displayed in `fzf`, and be printed to output when selected.
 
 | Character | Visible in fzf | Printed to output |
 |-----------|----------------|-------------------|
@@ -63,7 +63,7 @@ bwul && bwls gmail | bwse cco .name .login.username '.[] | .fields | length' | c
 ```zsh
 local fieldname="email"
 local fieldpath="[.fields[] | select(.name == \"$fieldname\") | .value] | first"
-bwul && (bwls wikipedia | bwse co .name "$fieldpath" | clipcopy)
+bwul && (bwls -l -s wikipedia | bwse co .name "$fieldpath" | clipcopy)
 ```
 
 By using the JQ path `$fieldpath` that selects the field named "email", this example lets you copy one of the emails associated with the search string `wikipedia`. Any item not containing this field will not be displayed.
@@ -71,7 +71,7 @@ By using the JQ path `$fieldpath` that selects the field named "email", this exa
 ```zsh
 local fieldname="email"
 local fieldpath=".fields.value | select(.name == \"$fieldname\") | .value"
-bwul && (bwls wikipedia | bwgf | bwse co .name "$fieldpath" | clipcopy)
+bwul && (bwls -ls wikipedia | bwgf | bwse co .name "$fieldpath" | clipcopy)
 ```
 
 Equivalent code but using group by field rather than selecting the first matching (in case of duplicates)
@@ -79,7 +79,7 @@ Equivalent code but using group by field rather than selecting the first matchin
 ```zsh
 local fieldname="email"
 local fieldpath=".fields.value | select(.name == \"$fieldname\") | .value"
-bwul && (bwls wikipedia | bwgf | bwtbl .name "$fieldpath")
+bwul && (bwls -ls wikipedia | bwgf | bwtbl .name "$fieldpath")
 ```
 
 This example is the same, but instead of fzf selection, it displays all results in a TSV table.
