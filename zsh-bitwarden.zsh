@@ -130,11 +130,11 @@ bw_search() {
 
   if (( $#carg )); then
     colopts="${carg[-1]}"
-  else
-    for ((i=0; i < $#; i++)); do
-      colopts="${colopts}o"
-    done
   fi
+
+  while [ ${#colopts} -lt $# ]; do
+    colopts="${colopts}o"
+  done
 
   local columns=()
   local visible=()
@@ -263,7 +263,6 @@ bw_copy() {
 bw_tsv() {
   local -a pedit parg carg sarg rarg farg larg narg bw_list_args
   zparseopts -D -F -K -- \
-             {e,-e}=editarg \
              {p,-clipboard}=parg \
              {c,-columns}:=carg \
              {s,-search}:=sarg \
@@ -283,10 +282,10 @@ bw_tsv() {
   (( $#larg)) && bw_list_args+=("-l")
   (( $#narg)) && bw_list_args+=("-n")
   local res
+
   if (( $#rarg )); then
     local -a bw_search_args
-    (( $#carg)) && bw_search_args+=("-c" "${carg[-1]}")
-    #TODO: fill out repeated `o` when $1 is different
+    (( $#carg )) && bw_search_args+=("-c" "${carg[-1]}")
     IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_search "${bw_search_args[@]}" "$@")
   else
     IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_table $@)
@@ -439,14 +438,12 @@ bw_edit_field() {
     bw_get_item "$uuid" <<< "$items" | bw_edit_item "$uuid" "del(.fields[$idx])"
     return
   fi
-  if [[ -t 0 ]]; then
-    if (( $#rarg)); then
-      vared -p "Edit $name > " name
-    else
+  if (( $#rarg)); then
+    if [[ -t 0 ]]; then
       vared -p "Edit $name > " val
+    else
+      val=$(</dev/stdin)
     fi
-  else
-    val=$(</dev/stdin)
   fi
   bw_get_item "$uuid" <<< "$items" | bw_edit_item "$uuid" ".fields[$idx].name=\"$name\" | .fields[$idx].value=\"$val\""
 }
