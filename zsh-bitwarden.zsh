@@ -39,6 +39,14 @@ _bw_test_subshell() {
   fi
 }
 
+bw_escape_jq() {
+  sed -e 's/\t/\\t/g' -e 's/\n/\\n/g' -e 's/\r/\\r/g'
+}
+
+bw_raw_jq() {
+  sed -e 's/\\t/\t/g' -e 's/\\n/\n/g' -e 's/\\r/\r/g'
+}
+
 # Takes JSON as stdin and jq paths to extract into tsv as args
 bw_table() {
   if [[ "$#" == 0 ]]; then
@@ -71,6 +79,7 @@ bw_table() {
   printf "%s\n" "$jq_output"
 }
 
+#NOTE: bw escapes \t\n
 # Takes tsv as stdin and columns to show in fzf as args
 _bw_select() {
 
@@ -490,10 +499,12 @@ bw_edit_name() {
   fi
   IFS=$'\t' read -r uuid val <<< "$res"
   if [[ -t 0 ]]; then
+    val=$(bw_raw_jq <<< "$val")
     vared -p "Edit name > " val
   else
     val=$(</dev/stdin)
   fi
+  val=$(bw_escape_jq <<< "$val")
   bw_get_item "$uuid" <<< "$items" | bw_edit_item_assign "$uuid" ".name" "$val"
 }
 
@@ -528,10 +539,12 @@ bw_edit_username() {
   fi
   IFS=$'\t' read -r uuid val <<< "$res"
   if [[ -t 0 ]]; then
+    val=$(bw_raw_jq <<< "$val")
     vared -p "Edit username > " val
   else
     val=$(</dev/stdin)
   fi
+  val=$(bw_escape_jq <<< "$val")
   bw_get_item "$uuid" <<< "$items" | bw_edit_item_assign "$uuid" .login.username "$val"
 }
 
@@ -551,10 +564,12 @@ bw_edit_password() {
   fi
   IFS=$'\t' read -r uuid val <<< "$res"
   if [[ -t 0 ]]; then
+    val=$(bw_raw_jq <<< "$val")
     vared -p "Edit password > " val
   else
     val=$(</dev/stdin)
   fi
+  val=$(bw_escape_jq <<< "$val")
   bw_get_item "$uuid" <<< "$items" | bw_edit_item_assign "$uuid" .login.password "$val"
 }
 
@@ -570,10 +585,12 @@ bw_edit_note() {
   res=$(bw_search -c Oco .id .name .notes <<< "$items")
   IFS=$'\t' read -r uuid val <<< "$res"
   if [[ -t 0 ]]; then
+    val=$(bw_raw_jq <<< "$val")
     vared -p $'Edit note |\n-----------\n' val
   else
     val=$(</dev/stdin)
   fi
+  val=$(bw_escape_jq <<< "$val")
   bw_get_item "$uuid" <<< "$items" | bw_edit_item_assign "$uuid" .notes "$val"
 }
 
@@ -590,21 +607,26 @@ bw_create_login() {
   fi
   local name username uuid
   if (( $#narg)); then
+    name=$(bw_raw_jq <<< "$name")
     name="${narg[-1]}"
   else
     vared -p "Login item name > " name
   fi
+  name=$(bw_escape_jq <<< "$name")
   if (( $#uarg)); then
     username="${uarg[-1]}"
   else
+    username=$(bw_raw_jq <<< "$username")
     vared -p "Login item username > " username
   fi
+  username=$(bw_escape_jq <<< "$username")
   local pass
   if [ -t 0 ] ; then
     pass="$(bw generate -ulns --length 21)"
   else
     pass="$(</dev/stdin)"
   fi
+  val=$(bw_escape_jq <<< "$val")
   bw get template item \
     | jq ".name=\"${name}\" | .login={\"username\":\"${username}\", \"password\": \"$pass\"}" \
     | bw encode | bw create item | jq -r '.login.password'
@@ -624,13 +646,17 @@ bw_create_note() {
   if (( $#narg)); then
     name="${narg[-1]}"
   else
+    name=$(bw_raw_jq <<< "$name")
     vared -p "Note item name > " name
   fi
+  name=$(bw_escape_jq <<< "$name")
   if [[ -t 0 ]]; then
+    val=$(bw_raw_jq <<< "$val")
     vared -p $'Enter note |\n-----------\n' val
   else
     val=$(</dev/stdin)
   fi
+  val=$(bw_escape_jq <<< "$val")
   uuid=$(bw get template item \
            | jq ".name=\"${name}\" | .notes=\"${val}\" | .type=2 | .secureNote.type = 0" \
            | bw encode | bw create item | jq -r '.id')
