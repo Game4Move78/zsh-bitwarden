@@ -123,8 +123,30 @@ _bw_select() {
 
 bw_search() {
   local -a carg
+
   zparseopts -D -F -K -- \
              {c,-columns}:=carg || return
+
+  # local -a POSITIONAL_ARGS=()
+  # while [[ $# -gt 0 ]]; do
+  #   local old="$1"
+  #   shift
+  #   case $old in
+  #     -c|--columns)
+  #       carg="$1"
+  #       shift
+  #       ;;
+  #     -*|--*)
+  #       echo "Unknown option $old" >&2
+  #       exit 1
+  #       ;;
+  #     *)
+  #       POSITIONAL_ARGS+=("$old") # save positional arg
+  #       ;;
+  #   esac
+  # done
+
+  # set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
   local colopts=""
 
@@ -261,12 +283,12 @@ bw_copy() {
 }
 
 bw_tsv() {
-  local -a pedit parg carg sarg rarg farg larg narg bw_list_args
+  local -a pedit parg carg sarg targ farg larg narg bw_list_args
   zparseopts -D -F -K -- \
              {p,-clipboard}=parg \
              {c,-columns}:=carg \
              {s,-search}:=sarg \
-             {r,-row}=rarg \
+             {t,-table}=targ \
              {f,-fields}=farg \
              {l,-login}=larg \
              {n,-note}=narg || return
@@ -428,19 +450,25 @@ bw_edit_field() {
   local path_val=".fields.value | select(.name == \"$name\") | .value"
   local path_idx=".fields.key"
   local uuid val idx res
-  res=$(bw_search -c OcoO .id .name "$path_val" "$path_idx" <<< "$grp_items")
+  res=$(bw_search -c OooO .id .name "$path_val" "$path_idx" <<< "$grp_items")
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find field $name with search string ${sarg[-1]}"
     return 1
   fi
-  IFS=$'\t' read -r uuid val idx <<< "$res"
+  IFS=$'\t' read -r uuid name val idx <<< "$res"
   if (( $#darg)); then
     bw_get_item "$uuid" <<< "$items" | bw_edit_item "$uuid" "del(.fields[$idx])"
     return
   fi
   if (( $#rarg)); then
     if [[ -t 0 ]]; then
-      vared -p "Edit $name > " val
+      vared -p "Edit field name > " name
+    else
+      name=$(</dev/stdin)
+    fi
+  else
+    if [[ -t 0 ]]; then
+      vared -p "Edit field $name > " val
     else
       val=$(</dev/stdin)
     fi
