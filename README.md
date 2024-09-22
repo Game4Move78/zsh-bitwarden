@@ -11,6 +11,8 @@ See [INSTALL.md](INSTALL.md).
 | Command    | Description                 |
 |------------|-----------------------------|
 | `bwul`     | unlock the vault            |
+| `bwtsv`    | print tsv table             |
+| `bwtsv -r` | select tsv row              |
 | `bwg`      | alphanum + special password |
 | `bwgs`     | alphanum password           |
 | `bwus`     | get username                |
@@ -46,14 +48,13 @@ bwfl -s mynewlogin -f myfield | clipcopy
 echo newvalue | bwfle -s mynewlogin -f myfield -r
 ```
 
-## bwse examples
+### Search
 
 ```zsh
-bwul && bwls -ls gmail | bwse cco .name .login.username '.[] | .fields | length' | clipcopy
-# `bwul && bwls -ls gmail | bwse` can be shortened to
+bwtsv -lrc cco .name .login.username '.[] | .fields | length' | clipcopy
 ```
 
-`bwul` unlocks the vault. `bwls -ls gmail` searches for "gmail" (`-s gmail`) and returns matching logins (`-l`). With `bse` each character in the first argument (`cco`) corresponds to the subsequent arguments. The use of `cc` along with `.name` and `.login.username` causes the name and username of each item to be displayed in `fzf`. The use of `o` along with `'.[] | .fields | length'` causes the number of fields to be displayed in `fzf`, and be printed to output when selected.
+This command searches for "gmail" (`-s gmail`) and returns matching logins (`-l`). When using `bwtsv -r` each character in option `-c` (`cco`) corresponds to the arguments. The use of `cc` along with first two arguments `.name` and `.login.username` causes the name and username of each item to be displayed in `fzf`. The use of `o` along with `'.[] | .fields | length'` causes the number of fields to be displayed in `fzf`, and be printed to output when selected. If `-c` is omitted all are printed.
 
 | Character | Visible in fzf | Printed to output |
 |-----------|----------------|-------------------|
@@ -64,7 +65,7 @@ bwul && bwls -ls gmail | bwse cco .name .login.username '.[] | .fields | length'
 ```zsh
 local fieldname="email"
 local fieldpath="[.fields[] | select(.name == \"$fieldname\") | .value] | first"
-bwul && (bwls -ls wikipedia | bwse co .name "$fieldpath" | clipcopy)
+bwtsv -lrs wikipedia -c cco .name .name .login.username "$fieldpath" | clipcopy
 ```
 
 By using the JQ path `$fieldpath` that selects the field named "email", this example lets you copy one of the emails associated with the search string `wikipedia`. Any item not containing this field will not be displayed.
@@ -72,29 +73,20 @@ By using the JQ path `$fieldpath` that selects the field named "email", this exa
 ```zsh
 local fieldname="email"
 local fieldpath=".fields.value | select(.name == \"$fieldname\") | .value"
-bwul && (bwls -lfs wikipedia | bwse co .name "$fieldpath" | clipcopy)
+bwtsv -flrs wikipedia -c cco .name .name .login.username "$fieldpath" | clipcopy
 ```
 
 Equivalent code but using group by field (`-f`) rather than selecting the first matching (in case of duplicates)
 
-```zsh
-local fieldname="email"
-local fieldpath=".fields.value | select(.name == \"$fieldname\") | .value"
-bwul && (bwls -lfs wikipedia | bwtbl .name "$fieldpath")
-```
-
-This example is the same, but instead of fzf selection, it displays all results in a TSV table.
+### TSV Table
 
 ```zsh
 local fieldname="email"
 local fieldpath=".fields.value | select(.name == \"$fieldname\") | .value"
-# select username
-bwtsv -lrs wikipedia cco .name .name .login.username '.[] | .fields | length' | clipcopy
-# print table
 bwtsv -ls wikipedia .name .name .login.username '.[] | .fields | length' | clipcopy
 ```
 
-This example is the same, but shortened using the `bwtsv` helper function.
+When omitting `-r` instead of fzf selection, `bwtsv` displays all results in a TSV table.
 
 ## Notes
 
