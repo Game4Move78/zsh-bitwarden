@@ -228,7 +228,31 @@ bw_list() {
   if (( $#farg)); then
     items=$(bw_group_fields <<< "$items")
   fi
-  printf "%s" "$items"
+  # Command substitution removes newline
+  printf "%s\n" "$items"
+}
+
+bw_tsv() {
+  local -a args sarg larg narg farg bw_list_args
+  zparseopts -D -F -K -- \
+             {r,-row}:=rarg \
+             {s,-search}:=sarg \
+             {f,-fields}=farg \
+             {l,-login}=larg \
+             {n,-note}=narg || return
+  if ! bw_unlock; then
+    return 1
+  fi
+  (( $#sarg)) && bw_list_args+=("-s" "${sarg[-1]}")
+  (( $#farg)) && bw_list_args+=("-f")
+  (( $#larg)) && bw_list_args+=("-l")
+  (( $#narg)) && bw_list_args+=("-n")
+  if (( $#rarg )); then
+    #TODO: fill out repeated `o` when $1 is different
+    bw_list "${bw_list_args[@]}" | bw_search $@
+  else
+    bw_list "${bw_list_args[@]}" | bw_table $@
+  fi
 }
 
 bw_user_pass() {
@@ -340,6 +364,7 @@ bw_edit_field() {
 
   local -a sarg farg rarg darg
   zparseopts -D -F -K -- \
+             {n,-new}=narg \
              {r,-rename}=rarg \
              {d,-delete}=darg \
              {s,-search}:=sarg \
@@ -508,7 +533,7 @@ bw_edit_note() {
   fi
   local items=$(bw_list -n -s "${sarg[-1]}")
   local uuid val res
-  res=$(bw_search Oco .id .name .notes)
+  res=$(bw_search Oco .id .name .notes <<< "$items")
   IFS=$'\t' read -r uuid val <<< "$res"
   if [[ -t 0 ]]; then
     vared -p $'Edit note |\n-----------\n' val
@@ -578,9 +603,11 @@ bw_create_note() {
 }
 
 alias bwls='bw_list'
+alias bwtsv='bw_tsv'
 alias bwgf='bw_group_fields'
 alias bwtbl='bw_table'
 alias bwul='bw_unlock'
+alias bwse='bw_search'
 alias bwse='bw_search'
 alias bwn='bw_name'
 alias bwus='bw_username'
