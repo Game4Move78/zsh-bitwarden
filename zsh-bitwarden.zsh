@@ -263,7 +263,7 @@ bw_copy() {
 bw_tsv() {
   local -a pedit parg carg sarg rarg farg larg narg bw_list_args
   zparseopts -D -F -K -- \
-             {e,-e}=pedit \
+             {e,-e}=editarg \
              {p,-clipboard}=parg \
              {c,-columns}:=carg \
              {s,-search}:=sarg \
