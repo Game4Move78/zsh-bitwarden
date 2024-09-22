@@ -494,7 +494,7 @@ bw_edit_name() {
   else
     val=$(</dev/stdin)
   fi
-  bw_edit_item_assign "$uuid" ".name" "$val"
+  bw_get_item "$uuid" <<< "$items" | bw_edit_item_assign "$uuid" ".name" "$val"
 }
 
 bw_filter_type() {
@@ -532,7 +532,7 @@ bw_edit_username() {
   else
     val=$(</dev/stdin)
   fi
-  bw_edit_item_assign "$uuid" .login.username "$val"
+  bw_get_item "$uuid" <<< "$items" | bw_edit_item_assign "$uuid" .login.username "$val"
 }
 
 bw_edit_password() {
@@ -555,7 +555,7 @@ bw_edit_password() {
   else
     val=$(</dev/stdin)
   fi
-  bw_edit_item_assign "$uuid" .login.password "$val"
+  bw_get_item "$uuid" <<< "$items" | bw_edit_item_assign "$uuid" .login.password "$val"
 }
 
 bw_edit_note() {
@@ -574,7 +574,7 @@ bw_edit_note() {
   else
     val=$(</dev/stdin)
   fi
-  bw_edit_item_assign "$uuid" .notes "$val"
+  bw_get_item "$uuid" <<< "$items" | bw_edit_item_assign "$uuid" .notes "$val"
 }
 
 bw_create_login() {
