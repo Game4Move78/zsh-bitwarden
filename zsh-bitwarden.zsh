@@ -283,8 +283,9 @@ bw_copy() {
 }
 
 bw_tsv() {
-  local -a pedit parg carg sarg targ farg larg narg bw_list_args
+  local -a npathsarg parg carg sarg targ farg larg narg bw_list_args
   zparseopts -D -F -K -- \
+             -npaths:=npathsarg \
              {p,-clipboard}=parg \
              {c,-columns}:=carg \
              {s,-search}:=sarg \
@@ -299,10 +300,19 @@ bw_tsv() {
   if ! bw_unlock; then
     return 1
   fi
+
+  if (( $#npathsarg)); then
+    while (( $# > ${npathsarg[-1]})); do
+      sarg[-1]="${@[-1]}"
+      set -- "${@[1,-2]}"
+    done
+  fi
+
   (( $#sarg)) && bw_list_args+=("-s" "${sarg[-1]}")
   (( $#farg)) && bw_list_args+=("-f")
   (( $#larg)) && bw_list_args+=("-l")
   (( $#narg)) && bw_list_args+=("-n")
+
   local res
 
   if (( $#targ )); then
@@ -318,6 +328,90 @@ bw_tsv() {
     printf "%s" "$res"
   fi
 }
+
+# bw_tsv() {
+#   local -a pedit parg carg sarg rarg farg larg narg bw_list_args
+#   zparseopts -D -F -K -- \
+#              {e,-e}=earg \
+#              {p,-clipboard}=parg \
+#              {c,-columns}:=carg \
+#              {s,-search}:=sarg \
+#              {r,-row}=rarg \
+#              {f,-fields}=farg \
+#              {l,-login}=larg \
+#              {n,-note}=narg || return
+#   if [[ "$#" == 0 ]]; then
+#     echo "Usage: $0 [PATH]..."
+#     return 1
+#   fi
+#   if ! bw_unlock; then
+#     return 1
+#   fi
+#   (( $#sarg)) && bw_list_args+=("-s" "${sarg[-1]}")
+#   (( $#farg)) && bw_list_args+=("-f")
+#   (( $#larg)) && bw_list_args+=("-l")
+#   (( $#narg)) && bw_list_args+=("-n")
+#   local res
+
+#   local colopts=""
+
+#   if (( $#carg )); then
+#     colopts="${carg[-1]}"
+#   fi
+#   while [ ${#colopts} -lt $# ]; do
+#     colopts="${colopts}o"
+#   done
+
+#   local outpaths=()
+#   for ((i = 1; i <= $#; i++)); do
+#     if [[ "${colopts[i]}" != "c" ]]; then
+#       outpaths+=("${(P)i}")
+#     fi
+#   done
+
+#   if (( $#rarg || $#earg )); then
+#     local -a bw_search_args
+#     bw_search_args+=("-c" "O${colopts}")
+#     #TODO: fill out repeated `o` when $1 is different
+#     IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_search "${bw_search_args[@]}" .id "$@")
+#   else
+#     IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_table $@)
+#   fi
+#   local -a parts=("${(@s:	:)res}")
+#   local uuid="${parts[1]}"
+#   parts=("${parts[@]:1}")
+#   res="${(j:\t:)parts[@]}"
+#   #TODO  assignment
+#   # START assignment
+#   if (( $#earg )); then
+#     local -a new
+#     if [[ -t 0 ]]; then
+#       for (( i = 1; i <= $#parts; i++)); do
+#         local val=$(bw_raw_jq <<< "${parts[$i]}")
+#         vared -p "Edit ${outpaths[$i]} > " val
+#         new[$i]="$val"
+#       done
+#     else
+#       local new_res=$(</dev/stdin)
+#       new=("${(@s:	:)inp}")
+#       # for ((i = 1; i <= $#; i++)); do
+#       #   new[$i]=new[$i]
+#       # done
+#     fi
+#     local filter=""
+#     filter="${outpaths[1]} = \"${new[1]}\""
+#     for (( i = 2; i <= $#parts; i++)); do
+#       filter="| ${outpaths[1]} = \"${new[1]}\""
+#     done
+#     echo "$filter"
+#     bw_get_item "$uuid" <<< "$items" | bw_edit_item "$uuid" "$filter"
+#   # END assignment
+#   elif (( $#parg )); then
+#     bw_copy <<< "$res"
+#   else
+#     printf "%s" "$res"
+#   fi
+# }
 
 bw_user_pass() {
   local -a sarg
@@ -336,33 +430,34 @@ bw_user_pass() {
   read _ && cut -f 2 <<< $userpass | clipcopy
 }
 
-bw_name() {
-  local -a sarg
-  zparseopts -D -F -K -- \
-             {s,-search}:=sarg || return
-  bw_unlock && bw_list -s "${sarg[-1]}" | bw_search -c oc .name .login.username
-}
+# bw_name() {
+#   local -a sarg
+#   zparseopts -D -F -K -- \
+#              {s,-search}:=sarg || return
+#   bw_unlock && bw_list -s "${sarg[-1]}" | bw_search -c oc .name .login.username
+# }
 
-bw_username() {
-  local -a sarg
-  zparseopts -D -F -K -- \
-             {s,-search}:=sarg || return
-  bw_unlock && bw_list -l -s "${sarg[-1]}" | bw_search -c co .name .login.username
-}
+# bw_username() {
+#   local -a sarg
+#   zparseopts -D -F -K -- \
+#              {s,-search}:=sarg || return
+#   bw_unlock && bw_list -l -s "${sarg[-1]}" | bw_search -c co .name .login.username
+# }
 
-bw_password() {
-  local -a sarg
-  zparseopts -D -F -K -- \
-             {s,-search}:=sarg || return
-  bw_unlock && bw_list -l -s "${sarg[-1]}" | bw_search -c ccO .name .login.username .login.password
-}
+# bw_password() {
+#   local -a sarg
+#   zparseopts -D -F -K -- \
+#              {s,-search}:=sarg || return
+#   bw_tsv -ls "${sarg[-1]}" -c ccO .name .login.username .login.password
+#   bw_unlock && bw_list -l -s "${sarg[-1]}" | bw_search -c ccO .name .login.username .login.password
+# }
 
-bw_note() {
-  local -a sarg
-  zparseopts -D -F -K -- \
-             {s,-search}:=sarg || return
-  bw_unlock && bw_list -n -s "${sarg[-1]}" | bw_search -c co .name .notes
-}
+# bw_note() {
+#   local -a sarg
+#   zparseopts -D -F -K -- \
+#              {s,-search}:=sarg || return
+#   bw_unlock && bw_list -n -s "${sarg[-1]}" | bw_search -c co .name .notes
+# }
 
 bw_select_values() {
   jq -rceM "[.[] | $1] | unique | .[]" \
@@ -690,10 +785,10 @@ bw_create_note() {
 alias bwls='bw_list'
 alias bwtsv='bw_tsv'
 alias bwul='bw_unlock'
-alias bwn='bw_name'
-alias bwus='bw_username'
-alias bwpw='bw_password'
-alias bwno='bw_note'
+alias bwn='bw_tsv --npaths 2 -c oc .name .login.username'
+alias bwus='bw_tsv --npaths 2 -c co .name .login.username'
+alias bwpw='bw_tsv --npaths 3 -c ccO .name .login.username .login.password'
+alias bwno='bw_tsv --npaths 2 -c co .name .notes'
 alias bwfl='bw_field'
 alias bwup='bw_user_pass'
 alias bwne='bw_edit_name'
