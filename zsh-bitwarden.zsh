@@ -305,12 +305,12 @@ bw_tsv() {
   (( $#narg)) && bw_list_args+=("-n")
   local res
 
-  if (( $#rarg )); then
+  if (( $#targ )); then
+    IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_table $@)
+  else
     local -a bw_search_args
     (( $#carg )) && bw_search_args+=("-c" "${carg[-1]}")
     IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_search "${bw_search_args[@]}" "$@")
-  else
-    IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_table $@)
   fi
   if (( $#parg )); then
     bw_copy <<< "$res"
