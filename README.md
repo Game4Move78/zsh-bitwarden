@@ -51,7 +51,7 @@ echo newvalue | bwfle -s mynewlogin -f myfield -r
 ### Search
 
 ```zsh
-bwtsv -lrc cco .name .login.username '.[] | .fields | length' | clipcopy
+bwtsv -s gmail -lrc cco .name .login.username '.[] | .fields | length' | clipcopy
 ```
 
 This command searches for "gmail" (`-s gmail`) and returns matching logins (`-l`). When using `bwtsv` each character in option `-c` (`cco`) corresponds to the arguments. The use of `cc` along with first two arguments `.name` and `.login.username` causes the name and username of each item to be displayed in `fzf`. The use of `o` along with `'.[] | .fields | length'` causes the number of fields to be displayed in `fzf`, and be printed to output when selected. If `-c` is omitted all are printed.
