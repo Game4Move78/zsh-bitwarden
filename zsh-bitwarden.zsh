@@ -239,8 +239,8 @@ bw_search() {
 }
 
 bw_unlock() {
-  #TODO Substitute obscure "mac failed" message with "please sync vault"
-  if [ -z $BW_SESSION ] || [ "$(bw status | jq -r '.status')" = "locked" ]; then
+  if [ -z "$BW_SESSION" ] || [ "$(bw status 2> /dev/null | jq -r '.status')" = "locked" ]; then
+    unset BW_SESSION # Get rid of `MAC comparison failed` message
     if ! _bw_test_subshell; then
       local bwul_alias=$(_bw_get_alias bw_unlock)
       echo "Can't export session key in forked process. Try \`$bwul_alias\` before piping." >&2
