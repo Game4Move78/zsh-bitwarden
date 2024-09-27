@@ -360,6 +360,10 @@ bw_tsv() {
   #   return 1
   # fi
 
+  if (( !$#parg )) && (( $#targ )); then
+    parg+=("-p")
+  fi
+
   local -a bw_list_args
   (( $#sarg)) && bw_list_args+=("${sarg[@]}")
   (( $#garg)) && bw_list_args+=("-g")
