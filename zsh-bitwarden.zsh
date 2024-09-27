@@ -302,16 +302,18 @@ bw_list_cache() {
 bw_list() {
   local -a sarg larg narg farg
   zparseopts -D -F -K -- \
-             {s,-search}:=sarg \
+             {s,-search}+:=sarg \
              {f,-fields}=farg \
              {l,-login}=larg \
              {n,-note}=narg || return
   local items=$(bw_list_cache)
   if (( $#sarg )); then
-    items=$(jq "[.[] | select(
+    for (( i = 2; i <= $#sarg; i+=2)); do
+      items=$(jq "[.[] | select(
      reduce [ .id, .name, .notes, .login.username, .login.password, (.fields[]?.value) ][] as \$field
-    (false; . or (\$field // \"\" | test(\"${sarg[-1]}\";\"i\")))
+    (false; . or (\$field // \"\" | test(\"${sarg[$i]}\";\"i\")))
       )]" <<< "$items")
+    done
   fi
   # local items=$(bw list items --search "${sarg[-1]}")
   if (( $#larg || $#narg)); then
@@ -346,7 +348,7 @@ bw_tsv() {
   zparseopts -D -K -E -- \
              {p,-clipboard}=parg \
              {o,c,O}+:=carg \
-             {s,-search}:=sarg \
+             {s,-search}+:=sarg \
              {t,-table}=targ \
              {f,-fields}=farg \
              {l,-login}=larg \
@@ -538,15 +540,14 @@ bw_group_fields() {
 bw_field() {
 
   local -a sarg farg
-  zparseopts -D -F -K -- \
-             {s,-search}:=sarg \
+  zparseopts -D -K -E -- \
              {f,-field}:=farg || return
 
   if ! bw_unlock; then
     return 1
   fi
 
-  local items=$(bw_list -s "${sarg[-1]}" | bw_group_fields)
+  local items=$(bw_list -f "$@")
 
   local name
   if (( $#farg)); then
@@ -558,7 +559,7 @@ bw_field() {
   #local fieldpath="[.fields[] | select(.name == \"$name\") | .value] | first"
   local fieldpath=".fields.value | select(.name == \"$name\") | .value"
 
-  bw_search -c co .name "$fieldpath" <<< "$items"
+  bw_search -c .name -o "$fieldpath" <<< "$items"
 }
 
 bw_get_item() {
