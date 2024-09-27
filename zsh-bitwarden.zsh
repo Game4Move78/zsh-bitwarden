@@ -482,12 +482,10 @@ bw_tsv_helper() {
 
 bw_user_pass() {
   local -a sarg
-  zparseopts -D -F -K -- \
-             {s,-search}:=sarg || return
   if ! bw_unlock; then
     return 1
   fi
-  local userpass=$(bw_list -l "${sarg[@]}" | bw_search -c .name -o .login.username -O .login.password)
+  local userpass=$(bw_list -l "$@" | bw_search -c .name -o .login.username -O .login.password)
   if [[ "$?" -ne 0 ]]; then
     return 2
   fi
@@ -595,17 +593,16 @@ bw_edit_item_append() {
 bw_edit_field() {
 
   local -a sarg farg rarg darg
-  zparseopts -D -F -K -- \
+  zparseopts -D -K -E -- \
              {n,-new}=narg \
              {r,-rename}=rarg \
              {d,-delete}=darg \
-             {s,-search}:=sarg \
              {f,-field}:=farg || return
 
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list "${sarg[@]}")
+  local items=$(bw_list "$@")
   local grp_items=$(bw_group_fields <<< "$items")
   local name
   if (( $#farg)); then
@@ -620,7 +617,7 @@ bw_edit_field() {
   local uuid val idx res
   res=$(bw_search -O .id -o .name -o "$path_val" -O "$path_idx" <<< "$grp_items")
   if [[ $? -ne 0 ]]; then
-    echo "Couldn't find field $name with search string ${sarg[@]}"
+    echo "Couldn't find field $name with search args $@"
     return 1
   fi
   IFS=$'\t' read -r uuid name val idx <<< "$res"
@@ -646,14 +643,13 @@ bw_edit_field() {
 
 bw_add_field() {
 
-  local -a sarg farg
-  zparseopts -D -F -K -- \
-             {s,-search}:=sarg \
+  local -a farg
+  zparseopts -D -K -E -- \
              {f,-field}:=farg || return
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list "${sarg[@]}")
+  local items=$(bw_list "$@")
   local name val
   if (( $#farg)); then
     name="${farg[-1]}"
@@ -663,7 +659,7 @@ bw_add_field() {
   local path_val="[(.fields[] | select(.name == \"$name\") | .value) // \"\"] | first"
   local res=$(bw_search -O .id -c .name -o "$path_val" <<< "$items")
   if [[ $? -ne 0 ]]; then
-    echo "Couldn't find items with search strings ${sarg[@]}"
+    echo "Couldn't find items with search args $@"
     return 1
   fi
   IFS=$'\t' read -r uuid val <<< "$res"
@@ -677,17 +673,14 @@ bw_add_field() {
 }
 
 bw_edit_name() {
-  local -a sarg
-  zparseopts -D -F -K -- \
-             {s,-search}:=sarg || return
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list "${sarg[@]}")
+  local items=$(bw_list "$@")
   local uuid val res
   res=$(bw_search -O .id -o .name -c .login.username <<< "$items")
   if [[ $? -ne 0 ]]; then
-    echo "Couldn't find items with search strings ${sarg[@]}"
+    echo "Couldn't find items with search strings $@"
     return 1
   fi
   IFS=$'\t' read -r uuid val <<< "$res"
@@ -725,7 +718,7 @@ bw_edit_username() {
   local uuid val res
   res=$(bw_search -O .id -c .name -o .login.username <<< "$items")
   if [[ $? -ne 0 ]]; then
-    echo "Couldn't find items with search string $1"
+    echo "Couldn't find items with search args $@"
     return 1
   fi
   IFS=$'\t' read -r uuid val <<< "$res"
@@ -741,16 +734,14 @@ bw_edit_username() {
 
 bw_edit_password() {
   local -a sarg
-  zparseopts -D -F -K -- \
-             {s,-search}:=sarg || return
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list -l "${sarg[@]}")
+  local items=$(bw_list -l "$@")
   local uuid val res
   res=$(bw_search -O .id -c .name -c .login.username -O .login.password <<< "$items")
   if [[ $? -ne 0 ]]; then
-    echo "Couldn't find items with search string $1"
+    echo "Couldn't find items with search args $@"
     return 1
   fi
   IFS=$'\t' read -r uuid val <<< "$res"
@@ -765,13 +756,10 @@ bw_edit_password() {
 }
 
 bw_edit_note() {
-  local -a sarg
-  zparseopts -D -F -K -- \
-             {s,-search}:=sarg || return
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list -n "${sarg[@]}")
+  local items=$(bw_list -n "$@")
   local uuid val res
   res=$(bw_search -O .id -c .name -o .notes <<< "$items")
   IFS=$'\t' read -r uuid val <<< "$res"
@@ -787,9 +775,8 @@ bw_edit_note() {
 
 bw_create_login() {
 
-  local -a sarg narg uarg
+  local -a narg uarg
   zparseopts -D -F -K -- \
-             {s,-search}:=sarg \
              {n,-name}:=narg \
              {u,-username}:=uarg || return
 
@@ -828,7 +815,6 @@ bw_create_note() {
 
   local -a sarg narg uarg
   zparseopts -D -F -K -- \
-             {s,-search}:=sarg \
              {n,-name}:=narg || return
 
   if ! bw_unlock; then
