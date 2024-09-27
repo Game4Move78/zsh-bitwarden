@@ -307,7 +307,7 @@ bw_list() {
   if (( $#sarg )); then
     items=$(jq "[.[] | select(
      reduce [ .id, .name, .notes, .login.username, .login.password, (.fields[]?.value) ][] as \$field
-    (false; . or (\$field // \"\" | test(\"${sarg[-1]}\")))
+    (false; . or (\$field // \"\" | test(\"${sarg[-1]}\";\"i\")))
       )]" <<< "$items")
   fi
   # local items=$(bw list items --search "${sarg[-1]}")
