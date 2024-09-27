@@ -298,13 +298,27 @@ bw_list_cache() {
   printf "%s" "$items"
 }
 
+bw_simplify() {
+
+  jq "[.[] | {
+     id: .id,
+     name: .name,
+     notes: .notes,
+     username: .login.username,
+     password: .login.password,
+     fields: ((.fields | group_by(.name) | map({(.[0].name): map(.value)}) | add )? // {})
+  }]"
+
+}
+
 bw_list() {
-  local -a sarg sxarg jarg larg narg garg
+  local -a sarg sxarg jarg larg narg garg simplifyarg
   zparseopts -D -F -K -- \
              {s,-search}+:=sarg \
-             {-search-name,-search-username,u,-search-password,p,-search-notes}+:=sxarg \
+             {-search-name,-search-user,u,-search-pass,p,-search-notes}+:=sxarg \
              {j,-jq-filter}:=jarg \
              {g,-group-fields}=garg \
+             -simplify=simplifyarg \
              {l,-login}=larg \
              {n,-note}=narg || return
   local items=$(bw_list_cache)
@@ -320,10 +334,10 @@ bw_list() {
       "--search-name")
         jqpath=".name"
       ;;
-      "--search-username"|"-u")
+      "--search-user"|"-u")
         jqpath=".login.username"
         ;;
-      "--search-password"|"-p")
+      "--search-pass"|"-p")
         jqpath=".login.password"
         ;;
       "--search-notes")
@@ -342,7 +356,9 @@ bw_list() {
     fi
     items=$(jq -ceM "[.[] | select(.type == $item_type)]" <<< "$items")
   fi
-  if (( $#garg )); then
+  if (( $#simplifyarg )); then
+    items=$(bw_simplify <<< "$items")
+  elif (( $#garg )); then
     items=$(bw_group_fields <<< "$items")
   fi
   for (( i = 2; i <= $#jarg; i+=2)); do
@@ -567,10 +583,6 @@ bw_field() {
              {p,-clipboard}=parg \
              {f,-field}:=farg || return
 
-  if ! bw_unlock; then
-    return 1
-  fi
-
   local items=$(bw_list -g "$@")
 
   local name
@@ -589,6 +601,30 @@ bw_field() {
   else
     bw_copy <<< "$res"
   fi
+}
+
+bw_field2() {
+
+  local -a sarg farg
+  zparseopts -D -K -E -- \
+             {p,-clipboard}=parg \
+             {f,-field}:=farg || return
+
+
+  local items=$(bw_list --simplify "$@")
+
+  local res=$(bw_search -c .name -c '.fields | keys_unsorted | select(length > 0) | tostring' -O '.fields | to_entries | tostring' <<< "$items")
+
+  res=$(bw_search -c '.key' -o '.value | tostring' <<< "$res")
+
+  res=$(bw_search -o . <<< "$res")
+
+  if (( $#parg )); then
+    printf "%s" "$res"
+  else
+    bw_copy <<< "$res"
+  fi
+
 }
 
 bw_get_item() {
