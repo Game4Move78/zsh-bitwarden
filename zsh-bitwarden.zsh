@@ -160,9 +160,6 @@ bw_search() {
     colopts+=("o")
   done
 
-  echo "${jqpaths}" > /tmp/jqpaths
-  echo "${colopts}" > /tmp/colopts
-
   local columns=()
   local visible=()
   local out=()
