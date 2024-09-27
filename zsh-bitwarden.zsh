@@ -299,21 +299,39 @@ bw_list_cache() {
 }
 
 bw_list() {
-  local -a sarg larg narg garg
+  local -a sarg sxarg jarg larg narg garg
   zparseopts -D -F -K -- \
              {s,-search}+:=sarg \
+             {-search-name,-search-username,u,-search-password,p,-search-notes}+:=sxarg \
+             {j,-jq-filter}:=jarg \
              {g,-group-fields}=garg \
              {l,-login}=larg \
              {n,-note}=narg || return
   local items=$(bw_list_cache)
-  if (( $#sarg )); then
-    for (( i = 2; i <= $#sarg; i+=2)); do
-      items=$(jq "[.[] | select(
-     reduce [ .id, .name, .notes, .login.username, .login.password, (.fields[]?.value) ][] as \$field
-    (false; . or (\$field // \"\" | test(\"${sarg[$i]}\";\"i\")))
-      )]" <<< "$items")
-    done
-  fi
+  for (( i = 2; i <= $#sarg; i+=2)); do
+    items=$(jq "[.[] | select(
+   reduce [ .id, .name, .notes, .login.username, .login.password, (.fields[]?.value) ][] as \$field
+  (false; . or (\$field // \"\" | test(\"${sarg[$i]}\";\"i\")))
+    )]" <<< "$items")
+  done
+  for (( i = 1; i <= $#sxarg; i+=2)); do
+    local jqpath=""
+    case "${sxarg[$i]}" in
+      "--search-name")
+        jqpath=".name"
+      ;;
+      "--search-username"|"-u")
+        jqpath=".login.username"
+        ;;
+      "--search-password"|"-p")
+        jqpath=".login.password"
+        ;;
+      "--search-notes")
+        jqpath=".login.notes"
+        ;;
+    esac
+    items=$(jq "[.[] | select($jqpath | test(\"${sxarg[(( $i + 1 ))]}\";\"i\")?)]" <<< "$items")
+  done
   # local items=$(bw list items --search "${sarg[-1]}")
   if (( $#larg || $#narg)); then
     local item_type
@@ -324,9 +342,12 @@ bw_list() {
     fi
     items=$(jq -ceM "[.[] | select(.type == $item_type)]" <<< "$items")
   fi
-  if (( $#garg)); then
+  if (( $#garg )); then
     items=$(bw_group_fields <<< "$items")
   fi
+  for (( i = 2; i <= $#jarg; i+=2)); do
+    items=$(jq -ceM "[.[] | select(${jarg[$i]})]" <<< "$items")
+  done
   # Command substitution removes newline
   printf "%s\n" "$items"
 }
