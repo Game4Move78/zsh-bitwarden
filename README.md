@@ -96,7 +96,7 @@ Since Bitwarden CLI can have slow startup times, GPG can be used to cache the en
 bw_enable_cache
 ```
 
-When this command is in the zshrc file, it will set variables `gpg --encrypt --default-recipient-self` to encrypt the vault, and store it in memory. Alternatively set them yourself.
+When this command is in the zshrc file, it will set the `ZSH_BW_CACHE*` environmental variables. When these variables are set `gpg --encrypt --default-recipient-self` will encrypt the vault and store it in memory. Alternatively set them yourself. E.g.
 
 ```
 export ZSH_BW_CACHE="/run/user/$UID/zsh-bitwarden"
