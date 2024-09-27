@@ -122,10 +122,10 @@ _bw_select() {
 }
 
 bw_search() {
-  local -a carg
+  local -a carg # oarg Oarg
 
-  zparseopts -D -F -K -- \
-             {c,-columns}:=carg || return
+  zparseopts -D -K -E -- \
+             {o,c,O}:=carg || return
 
   # local -a POSITIONAL_ARGS=()
   # while [[ $# -gt 0 ]]; do
@@ -148,14 +148,16 @@ bw_search() {
 
   # set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
-  local colopts=""
+  local -a jqpaths colopts
 
-  if (( $#carg )); then
-    colopts="${carg[-1]}"
-  fi
+  for (( i = 1; i <= $#carg; i+=2)); do
+    colopts+=("${${carg[$i]}[-1]}")
+    jqpaths+=("${carg[(($i + 1))]}")
+  done
+  jqpaths+=("$@")
 
-  while [ ${#colopts} -lt $# ]; do
-    colopts="${colopts}o"
+  while [ ${#colopts} -lt $#jqpaths ]; do
+    colopts+=("o")
   done
 
   local columns=()
@@ -165,36 +167,35 @@ bw_search() {
 
   # local colopts=$1
   # local -a jqpaths=("${@:2}")
-  local -a jqpaths=("$@")
 
   # Validate remaining arguments (JQ paths)
-  if [ $# -lt 1 ]; then
+  if [ $#jqpaths -lt 1 ]; then
     echo "Error: At least one JQ path must be provided." >&2
     return 1
   fi
 
-  # Ensure the number of colopts matches the number of paths
-  if [ ${#colopts} -ne $# ]; then
-    echo "Error: The number of column options (${#colopts}) does not match the number of JQ paths ($# - 1)." >&2
+  # Ensure the number of colopts matches the number of jqpaths
+  if [ ${#colopts} -ne ${#jqpaths} ]; then
+    echo "Error: The number of column options (${#colopts}) does not match the number of JQ paths (${#jqpaths})." >&2
     return 1
   fi
 
   # Process the column options
-  for ((i = 0; i < ${#colopts}; i++)); do
-    local colopt="${colopts:$i:1}"
+  for ((i = 1; i <= ${#colopts}; i++)); do
+    local colopt="${colopts[$i]}"
     case "$colopt" in
       c)
-        visible+=($((i + 1)))  # Add column index to visible
+        visible+=($i)  # Add column index to visible
         ;;
       o)
-        visible+=($((i + 1)))
-        out+=($((i + 1)))  # Visible and output
+        visible+=($i)
+        out+=($i)  # Visible and output
         ;;
       O)
-        out+=($((i + 1)))  # Output only, not visible
+        out+=($i)  # Output only, not visible
         ;;
       *)
-        echo "Error: Invalid column option '$colopt' at position $((i + 1))" >&2
+        echo "Error: Invalid column option '$colopt' at position $i" >&2
         return 1
         ;;
     esac
@@ -238,9 +239,28 @@ bw_search() {
 
 }
 
+bw_enable_cache() {
+  export ZSH_BW_CACHE="/run/user/$UID/zsh-bitwarden"
+  export ZSH_BW_CACHE_LIST="$ZSH_BW_CACHE/bw-list-cache.gpg"
+  export ZSH_BW_CACHE_SESSION="$ZSH_BW_CACHE/bw-session.gpg"
+  mkdir -p "$ZSH_BW_CACHE"
+  chmod 700 "$ZSH_BW_CACHE"
+}
+
+bw_disable_cache() {
+  rm -rf "$ZSH_BW_CACHE"
+  unset ZSH_BW_CACHE
+  unset ZSH_BW_CACHE_LIST
+  unset ZSH_BW_CACHE_SESSION
+}
+
 bw_unlock() {
+  if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE_LIST" ]] && BW_SESSION=$(gpg --quiet --decrypt "$ZSH_BW_CACHE_SESSION" 2> /dev/null); then
+    export BW_SESSION="$BW_SESSION"
+    return
+  fi
   if [ -z "$BW_SESSION" ] || [ "$(bw status 2> /dev/null | jq -r '.status')" = "locked" ]; then
-    unset BW_SESSION # Get rid of `MAC comparison failed` message
+    unset BW_SESSION #
     if ! _bw_test_subshell; then
       local bwul_alias=$(_bw_get_alias bw_unlock)
       echo "Can't export session key in forked process. Try \`$bwul_alias\` before piping." >&2
@@ -248,10 +268,32 @@ bw_unlock() {
     fi
     if BW_SESSION=$(bw unlock --raw); then
       export BW_SESSION="$BW_SESSION"
+      if [[ -n "$ZSH_BW_CACHE" ]]; then
+        gpg --yes --encrypt --default-recipient-self --output "$ZSH_BW_CACHE_SESSION" <<< "$BW_SESSION"
+      fi
     else
       return 1
     fi
   fi
+}
+
+bw_list_cache() {
+
+  if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE_LIST" ]] && gpg --quiet --decrypt "$ZSH_BW_CACHE_LIST" 2> /dev/null; then
+    return
+  fi
+  if ! _bw_test_subshell; then
+    echo "Can't export session key in forked process.." >&2
+    return 1
+  fi
+  if ! bw_unlock; then
+    return 1
+  fi
+  local items=$(bw list items)
+  if [[ -n "$ZSH_BW_CACHE" ]]; then
+    gpg --yes --encrypt --default-recipient-self --output "$ZSH_BW_CACHE_LIST" <<< "$items"
+  fi
+  printf "%s" "$items"
 }
 
 bw_list() {
@@ -261,7 +303,14 @@ bw_list() {
              {f,-fields}=farg \
              {l,-login}=larg \
              {n,-note}=narg || return
-  local items=$(bw list items --search "${sarg[-1]}")
+  local items=$(bw_list_cache)
+  if (( $#sarg )); then
+    items=$(jq "[.[] | select(
+     reduce [ .id, .name, .notes, .login.username, .login.password, (.fields[]?.value) ][] as \$field
+    (false; . or (\$field // \"\" | test(\"${sarg[-1]}\")))
+      )]" <<< "$items")
+  fi
+  # local items=$(bw list items --search "${sarg[-1]}")
   if (( $#larg || $#narg)); then
     local item_type
     if (( $#larg)); then
@@ -283,32 +332,28 @@ bw_copy() {
 }
 
 bw_tsv() {
-  local -a npathsarg parg carg sarg targ farg larg narg bw_list_args
-  zparseopts -D -F -K -- \
-             -npaths:=npathsarg \
+  local -a \
+        parg \
+        carg \
+        sarg \
+        targ \
+        farg \
+        larg \
+        narg
+  zparseopts -D -K -E -- \
              {p,-clipboard}=parg \
-             {c,-columns}:=carg \
+             {o,c,O}:=carg \
              {s,-search}:=sarg \
              {t,-table}=targ \
              {f,-fields}=farg \
              {l,-login}=larg \
              {n,-note}=narg || return
-  if [[ "$#" == 0 ]]; then
-    echo "Usage: $0 [PATH]..."
-    return 1
-  fi
-  if ! bw_unlock; then
-    return 1
-  fi
+  # if ! bw_unlock; then
+  #   return 1
+  # fi
 
-  if (( $#npathsarg)); then
-    while (( $# > ${npathsarg[-1]})); do
-      sarg[-1]="${@[-1]}"
-      set -- "${@[1,-2]}"
-    done
-  fi
-
-  (( $#sarg)) && bw_list_args+=("-s" "${sarg[-1]}")
+  local -a bw_list_args
+  (( $#sarg)) && bw_list_args+=("${sarg[@]}")
   (( $#farg)) && bw_list_args+=("-f")
   (( $#larg)) && bw_list_args+=("-l")
   (( $#narg)) && bw_list_args+=("-n")
@@ -319,14 +364,28 @@ bw_tsv() {
     IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_table $@)
   else
     local -a bw_search_args
-    (( $#carg )) && bw_search_args+=("-c" "${carg[-1]}")
-    IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_search "${bw_search_args[@]}" "$@")
+    (( $#carg )) && bw_search_args+=("${carg[@]}")
+    IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_search "${bw_search_args[@]}")
   fi
   if (( $#parg )); then
     bw_copy <<< "$res"
   else
     printf "%s" "$res"
   fi
+}
+
+bw_tsv_helper() {
+  local -a jpathsarg colsarg
+  zparseopts -D -K -E -- \
+             {o,c,O}:=colsarg \
+             {j,-jpaths}+:=jpathsarg || return
+  echo "${colsarg[@]}"
+  jpaths=()
+  for (( i = 2; i <= $#jpathsarg; i+=2)); do
+    jpaths+=("${jpathsarg[$i]}")
+  done
+  echo "${jpaths[@]}"
+  echo $@
 }
 
 # bw_tsv() {
@@ -785,10 +844,10 @@ bw_create_note() {
 alias bwls='bw_list'
 alias bwtsv='bw_tsv'
 alias bwul='bw_unlock'
-alias bwn='bw_tsv --npaths 2 -c oc .name .login.username'
-alias bwus='bw_tsv --npaths 2 -c co .name .login.username'
-alias bwpw='bw_tsv --npaths 3 -c ccO .name .login.username .login.password'
-alias bwno='bw_tsv --npaths 2 -c co .name .notes'
+alias bwn='bw_tsv -o .name -c .login.username'
+alias bwus='bw_tsv -c .name -o .login.username'
+alias bwpw='bw_tsv -c .name -c .login.username -O .login.password'
+alias bwno='bw_tsv -c .name -o .notes'
 alias bwfl='bw_field'
 alias bwup='bw_user_pass'
 alias bwne='bw_edit_name'

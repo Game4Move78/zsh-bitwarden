@@ -88,6 +88,20 @@ bwtsv -ls wikipedia .name .name .login.username '.[] | .fields | length' | clipc
 
 When omitting `-r` instead of fzf selection, `bwtsv` displays all results in a TSV table.
 
-## Notes
+## GPG caching
 
-If input is provided to `bwuse`, `bpwe` and `bwfle` it will use this to set the value.
+Since Bitwarden CLI can have slow startup times, GPG can be used to cache results.
+
+```
+bw_enable_cache
+```
+
+If you put this command in your zshrc file then it will set variables that enable `gpg --encrypt --default-recipient-self` to encrypt the vault, and store it in memory. Alternatively set them yourself.
+
+```
+export ZSH_BW_CACHE="/run/user/$UID/zsh-bitwarden"
+export ZSH_BW_CACHE_LIST="$ZSH_BW_CACHE/bw-list-cache.gpg"
+export ZSH_BW_CACHE_SESSION="$ZSH_BW_CACHE/bw-session.gpg"
+mkdir -p "$ZSH_BW_CACHE"
+chmod 700 "$ZSH_BW_CACHE"
+```
