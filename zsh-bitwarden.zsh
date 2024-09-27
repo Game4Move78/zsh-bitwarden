@@ -125,7 +125,7 @@ bw_search() {
   local -a carg # oarg Oarg
 
   zparseopts -D -K -E -- \
-             {o,c,O}:=carg || return
+             {o,c,O}+:=carg || return
 
   # local -a POSITIONAL_ARGS=()
   # while [[ $# -gt 0 ]]; do
@@ -159,6 +159,9 @@ bw_search() {
   while [ ${#colopts} -lt $#jqpaths ]; do
     colopts+=("o")
   done
+
+  echo "${jqpaths}" > /tmp/jqpaths
+  echo "${colopts}" > /tmp/colopts
 
   local columns=()
   local visible=()
@@ -342,7 +345,7 @@ bw_tsv() {
         narg
   zparseopts -D -K -E -- \
              {p,-clipboard}=parg \
-             {o,c,O}:=carg \
+             {o,c,O}+:=carg \
              {s,-search}:=sarg \
              {t,-table}=targ \
              {f,-fields}=farg \
@@ -367,7 +370,7 @@ bw_tsv() {
     (( $#carg )) && bw_search_args+=("${carg[@]}")
     IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_search "${bw_search_args[@]}")
   fi
-  if (( $#parg )); then
+  if (( !$#parg )); then
     bw_copy <<< "$res"
   else
     printf "%s" "$res"
