@@ -257,8 +257,14 @@ bw_disable_cache() {
   unset ZSH_BW_CACHE_SESSION
 }
 
+bw_reset_cache_list() {
+  if [[ -n "ZSH_BW_CACHE_LIST" ]]; then
+    rm -f "$ZSH_BW_CACHE_LIST"
+  fi
+}
+
 bw_unlock() {
-  if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE_LIST" ]] && BW_SESSION=$(gpg --quiet --decrypt "$ZSH_BW_CACHE_SESSION" 2> /dev/null); then
+  if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE_SESSION" ]] && BW_SESSION=$(gpg --quiet --decrypt "$ZSH_BW_CACHE_SESSION" 2> /dev/null); then
     export BW_SESSION="$BW_SESSION"
     return
   fi
@@ -284,10 +290,6 @@ bw_list_cache() {
 
   if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE_LIST" ]] && gpg --quiet --decrypt "$ZSH_BW_CACHE_LIST" 2> /dev/null; then
     return
-  fi
-  if ! _bw_test_subshell; then
-    echo "Can't export session key in forked process.." >&2
-    return 1
   fi
   if ! bw_unlock; then
     return 1
@@ -574,6 +576,7 @@ bw_get_item() {
 }
 
 bw_edit_item() {
+  bw_reset_cache_list
   jq -ceM "$2" | bw encode | bw edit item "$1" > /dev/null
 }
 
@@ -715,12 +718,10 @@ bw_filter_type() {
 }
 
 bw_edit_username() {
-  zparseopts -D -F -K -- \
-             {s,-search}:=sarg || return
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list -l -s "${sarg[-1]}")
+  local items=$(bw_list -l "$@")
   local uuid val res
   res=$(bw_search -O .id -c .name -o .login.username <<< "$items")
   if [[ $? -ne 0 ]]; then
@@ -817,6 +818,7 @@ bw_create_login() {
     pass="$(</dev/stdin)"
   fi
   val=$(bw_escape_jq <<< "$val")
+  bw_reset_cache_list
   bw get template item \
     | jq ".name=\"${name}\" | .login={\"username\":\"${username}\", \"password\": \"$pass\"}" \
     | bw encode | bw create item | jq -r '.login.password'
@@ -847,6 +849,7 @@ bw_create_note() {
     val=$(</dev/stdin)
   fi
   val=$(bw_escape_jq <<< "$val")
+  bw_reset_cache_list
   uuid=$(bw get template item \
            | jq ".name=\"${name}\" | .notes=\"${val}\" | .type=2 | .secureNote.type = 0" \
            | bw encode | bw create item | jq -r '.id')
