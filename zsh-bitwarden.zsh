@@ -487,7 +487,7 @@ bw_user_pass() {
   if ! bw_unlock; then
     return 1
   fi
-  local userpass=$(bw_list -l -s "${sarg[-1]}" | bw_search -c .name -o .login.username -O .login.password)
+  local userpass=$(bw_list -l "${sarg[@]}" | bw_search -c .name -o .login.username -O .login.password)
   if [[ "$?" -ne 0 ]]; then
     return 2
   fi
@@ -605,7 +605,7 @@ bw_edit_field() {
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list -s "${sarg[-1]}")
+  local items=$(bw_list "${sarg[@]}")
   local grp_items=$(bw_group_fields <<< "$items")
   local name
   if (( $#farg)); then
@@ -620,7 +620,7 @@ bw_edit_field() {
   local uuid val idx res
   res=$(bw_search -O .id -o .name -o "$path_val" -O "$path_idx" <<< "$grp_items")
   if [[ $? -ne 0 ]]; then
-    echo "Couldn't find field $name with search string ${sarg[-1]}"
+    echo "Couldn't find field $name with search string ${sarg[@]}"
     return 1
   fi
   IFS=$'\t' read -r uuid name val idx <<< "$res"
@@ -653,7 +653,7 @@ bw_add_field() {
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list -s "${sarg[-1]}")
+  local items=$(bw_list "${sarg[@]}")
   local name val
   if (( $#farg)); then
     name="${farg[-1]}"
@@ -663,7 +663,7 @@ bw_add_field() {
   local path_val="[(.fields[] | select(.name == \"$name\") | .value) // \"\"] | first"
   local res=$(bw_search -O .id -c .name -o "$path_val" <<< "$items")
   if [[ $? -ne 0 ]]; then
-    echo "Couldn't find items with search string ${sarg[-1]}"
+    echo "Couldn't find items with search strings ${sarg[@]}"
     return 1
   fi
   IFS=$'\t' read -r uuid val <<< "$res"
@@ -683,11 +683,11 @@ bw_edit_name() {
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list -s "${sarg[-1]}")
+  local items=$(bw_list "${sarg[@]}")
   local uuid val res
   res=$(bw_search -O .id -o .name -c .login.username <<< "$items")
   if [[ $? -ne 0 ]]; then
-    echo "Couldn't find items with search string ${sarg[-1]}"
+    echo "Couldn't find items with search strings ${sarg[@]}"
     return 1
   fi
   IFS=$'\t' read -r uuid val <<< "$res"
@@ -746,7 +746,7 @@ bw_edit_password() {
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list -l -s "${sarg[-1]}")
+  local items=$(bw_list -l "${sarg[@]}")
   local uuid val res
   res=$(bw_search -O .id -c .name -c .login.username -O .login.password <<< "$items")
   if [[ $? -ne 0 ]]; then
@@ -771,7 +771,7 @@ bw_edit_note() {
   if ! bw_unlock; then
     return 1
   fi
-  local items=$(bw_list -n -s "${sarg[-1]}")
+  local items=$(bw_list -n "${sarg[@]}")
   local uuid val res
   res=$(bw_search -O .id -c .name -o .notes <<< "$items")
   IFS=$'\t' read -r uuid val <<< "$res"
