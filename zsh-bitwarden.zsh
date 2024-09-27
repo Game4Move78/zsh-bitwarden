@@ -300,10 +300,10 @@ bw_list_cache() {
 }
 
 bw_list() {
-  local -a sarg larg narg farg
+  local -a sarg larg narg garg
   zparseopts -D -F -K -- \
              {s,-search}+:=sarg \
-             {f,-fields}=farg \
+             {g,-group-fields}=garg \
              {l,-login}=larg \
              {n,-note}=narg || return
   local items=$(bw_list_cache)
@@ -325,7 +325,7 @@ bw_list() {
     fi
     items=$(jq -ceM "[.[] | select(.type == $item_type)]" <<< "$items")
   fi
-  if (( $#farg)); then
+  if (( $#garg)); then
     items=$(bw_group_fields <<< "$items")
   fi
   # Command substitution removes newline
@@ -342,7 +342,8 @@ bw_tsv() {
         carg \
         sarg \
         targ \
-        farg \
+        garg \
+        cflarg \
         larg \
         narg
   zparseopts -D -K -E -- \
@@ -350,7 +351,7 @@ bw_tsv() {
              {o,c,O}+:=carg \
              {s,-search}+:=sarg \
              {t,-table}=targ \
-             {f,-fields}=farg \
+             {g,-group-fields}=garg \
              {l,-login}=larg \
              {n,-note}=narg || return
   # if ! bw_unlock; then
@@ -359,7 +360,7 @@ bw_tsv() {
 
   local -a bw_list_args
   (( $#sarg)) && bw_list_args+=("${sarg[@]}")
-  (( $#farg)) && bw_list_args+=("-f")
+  (( $#garg)) && bw_list_args+=("-g")
   (( $#larg)) && bw_list_args+=("-l")
   (( $#narg)) && bw_list_args+=("-n")
 
@@ -372,10 +373,10 @@ bw_tsv() {
     (( $#carg )) && bw_search_args+=("${carg[@]}")
     IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_search "${bw_search_args[@]}")
   fi
-  if (( !$#parg )); then
-    bw_copy <<< "$res"
-  else
+  if (( $#parg )); then
     printf "%s" "$res"
+  else
+    bw_copy <<< "$res"
   fi
 }
 
@@ -484,7 +485,7 @@ bw_user_pass() {
   if ! bw_unlock; then
     return 1
   fi
-  local userpass=$(bw_list -l -s "${sarg[-1]}" | bw_search -c coO .name .login.username .login.password)
+  local userpass=$(bw_list -l -s "${sarg[-1]}" | bw_search -c .name -o .login.username -O .login.password)
   if [[ "$?" -ne 0 ]]; then
     return 2
   fi
@@ -541,13 +542,14 @@ bw_field() {
 
   local -a sarg farg
   zparseopts -D -K -E -- \
+             {p,-clipboard}=parg \
              {f,-field}:=farg || return
 
   if ! bw_unlock; then
     return 1
   fi
 
-  local items=$(bw_list -f "$@")
+  local items=$(bw_list -g "$@")
 
   local name
   if (( $#farg)); then
@@ -559,7 +561,12 @@ bw_field() {
   #local fieldpath="[.fields[] | select(.name == \"$name\") | .value] | first"
   local fieldpath=".fields.value | select(.name == \"$name\") | .value"
 
-  bw_search -c .name -o "$fieldpath" <<< "$items"
+  local res=$(bw_search -c .name -o "$fieldpath" <<< "$items")
+  if (( $#parg )); then
+    printf "%s" "$res"
+  else
+    bw_copy <<< "$res"
+  fi
 }
 
 bw_get_item() {
@@ -608,7 +615,7 @@ bw_edit_field() {
   local path_val=".fields.value | select(.name == \"$name\") | .value"
   local path_idx=".fields.key"
   local uuid val idx res
-  res=$(bw_search -c OooO .id .name "$path_val" "$path_idx" <<< "$grp_items")
+  res=$(bw_search -O .id -o .name -o "$path_val" -O "$path_idx" <<< "$grp_items")
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find field $name with search string ${sarg[-1]}"
     return 1
@@ -651,7 +658,7 @@ bw_add_field() {
     name=$(bw_select_field <<< "$items")
   fi
   local path_val="[(.fields[] | select(.name == \"$name\") | .value) // \"\"] | first"
-  local res=$(bw_search -c Oco .id .name "$path_val" <<< "$items")
+  local res=$(bw_search -O .id -c .name -o "$path_val" <<< "$items")
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search string ${sarg[-1]}"
     return 1
@@ -675,7 +682,7 @@ bw_edit_name() {
   fi
   local items=$(bw_list -s "${sarg[-1]}")
   local uuid val res
-  res=$(bw_search -c Ooc .id .name .login.username <<< "$items")
+  res=$(bw_search -O .id -o .name -c .login.username <<< "$items")
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search string ${sarg[-1]}"
     return 1
@@ -715,7 +722,7 @@ bw_edit_username() {
   fi
   local items=$(bw_list -l -s "${sarg[-1]}")
   local uuid val res
-  res=$(bw_search -c Oco .id .name .login.username <<< "$items")
+  res=$(bw_search -O .id -c .name -o .login.username <<< "$items")
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search string $1"
     return 1
@@ -740,7 +747,7 @@ bw_edit_password() {
   fi
   local items=$(bw_list -l -s "${sarg[-1]}")
   local uuid val res
-  res=$(bw_search -c OccO .id .name .login.username .login.password <<< "$items")
+  res=$(bw_search -O .id -c .name -c .login.username -O .login.password <<< "$items")
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search string $1"
     return 1
@@ -765,7 +772,7 @@ bw_edit_note() {
   fi
   local items=$(bw_list -n -s "${sarg[-1]}")
   local uuid val res
-  res=$(bw_search -c Oco .id .name .notes <<< "$items")
+  res=$(bw_search -O .id -c .name -o .notes <<< "$items")
   IFS=$'\t' read -r uuid val <<< "$res"
   if [[ -t 0 ]]; then
     val=$(bw_raw_jq <<< "$val")
