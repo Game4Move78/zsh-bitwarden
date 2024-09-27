@@ -35,7 +35,7 @@ See [INSTALL.md](INSTALL.md).
 
 ```zsh
 # create entry called `mylogin` with username `user123@example.com` and copy secure password to clipboard
-bwlc -n mylogin -u user123@example.com | clipcopy'
+bwlc -n mylogin -u user123@example.com
 # rename to mynewlogin
 echo mynewlogin | bwne -s mylogin
 # get username and password
@@ -43,7 +43,7 @@ bwup -s mynewlogin
 # add field
 echo myvalue | bwfla -s mynewlogin -f myfield
 # copy field
-bwfl -s mynewlogin -f myfield | clipcopy
+bwfl -s mynewlogin -f myfield
 # rename field to `newvalue`
 echo newvalue | bwfle -s mynewlogin -f myfield -r
 ```
@@ -51,10 +51,10 @@ echo newvalue | bwfle -s mynewlogin -f myfield -r
 ### Search
 
 ```zsh
-bwtsv -s gmail -lrc cco .name .login.username '.[] | .fields | length' | clipcopy
+bwtsv -s gmail -lrc -c .name -c .login.username -o '.[] | .fields | length'
 ```
 
-This command searches for "gmail" (`-s gmail`) and returns matching logins (`-l`). When using `bwtsv` each character in option `-c` (`cco`) corresponds to the arguments. The use of `cc` along with first two arguments `.name` and `.login.username` causes the name and username of each item to be displayed in `fzf`. The use of `o` along with `'.[] | .fields | length'` causes the number of fields to be displayed in `fzf`, and be printed to output when selected. If `-c` is omitted all are printed.
+This command searches for "gmail" (`-s gmail`) and returns matching logins (`-l`). The use of `-c` along with argument `.name` causes the name of each item to be displayed in `fzf`. The use of `-o` along with `'.[] | .fields | length'` causes the number of fields to be displayed in `fzf` and also printed to output when selected. 
 
 | Character | Visible in fzf | Printed to output |
 |-----------|----------------|-------------------|
@@ -65,7 +65,7 @@ This command searches for "gmail" (`-s gmail`) and returns matching logins (`-l`
 ```zsh
 local fieldname="email"
 local fieldpath="[.fields[] | select(.name == \"$fieldname\") | .value] | first"
-bwtsv -lrs wikipedia -c cco .name .name .login.username "$fieldpath" | clipcopy
+bwtsv -lrs wikipedia -c .name -c .login.username -o "$fieldpath"
 ```
 
 By using the JQ path `$fieldpath` that selects the field named "email", this example lets you copy one of the emails associated with the search string `wikipedia`. Any item not containing this field will not be displayed.
@@ -73,7 +73,7 @@ By using the JQ path `$fieldpath` that selects the field named "email", this exa
 ```zsh
 local fieldname="email"
 local fieldpath=".fields.value | select(.name == \"$fieldname\") | .value"
-bwtsv -flrs wikipedia -c cco .name .name .login.username "$fieldpath" | clipcopy
+bwtsv -flrs wikipedia -c .name -c .login.username -o "$fieldpath"
 ```
 
 Equivalent code but using group by field (`-f`) rather than selecting the first matching (in case of duplicates)
@@ -83,20 +83,20 @@ Equivalent code but using group by field (`-f`) rather than selecting the first 
 ```zsh
 local fieldname="email"
 local fieldpath=".fields.value | select(.name == \"$fieldname\") | .value"
-bwtsv -ls wikipedia .name .name .login.username '.[] | .fields | length' | clipcopy
+bwtsv -ls wikipedia -c .name -c .login.username -o '.[] | .fields | length'
 ```
 
 When omitting `-r` instead of fzf selection, `bwtsv` displays all results in a TSV table.
 
 ## GPG caching
 
-Since Bitwarden CLI can have slow startup times, GPG can be used to cache results.
+Since Bitwarden CLI can have slow startup times, GPG can be used to cache the encrypted results in memory and decrypt when needed.
 
 ```
 bw_enable_cache
 ```
 
-If you put this command in your zshrc file then it will set variables that enable `gpg --encrypt --default-recipient-self` to encrypt the vault, and store it in memory. Alternatively set them yourself.
+When this command is in the zshrc file, it will set variables `gpg --encrypt --default-recipient-self` to encrypt the vault, and store it in memory. Alternatively set them yourself.
 
 ```
 export ZSH_BW_CACHE="/run/user/$UID/zsh-bitwarden"
