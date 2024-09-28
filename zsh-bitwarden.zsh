@@ -919,7 +919,7 @@ bw_create_login() {
   fi
   local name username uuid
   if (( $#narg)); then
-    name=$(printf "%" "$name" | bw_raw_jq)
+    name=$(printf "%s" "$name" | bw_raw_jq)
     name="${narg[-1]}"
   else
     vared -p "Login item name > " name
@@ -928,7 +928,7 @@ bw_create_login() {
   if (( $#uarg)); then
     username="${uarg[-1]}"
   else
-    username=$(printf "%" "$username" | bw_raw_jq)
+    username=$(printf "%s" "$username" | bw_raw_jq)
     vared -p "Login item username > " username
   fi
   username=$(printf "%s" "$username" | bw_escape_jq)
@@ -958,7 +958,7 @@ bw_create_note() {
   if (( $#narg)); then
     name="${narg[-1]}"
   else
-    name=$(printf "%" "$name" | bw_raw_jq)
+    name=$(printf "%s" "$name" | bw_raw_jq)
     vared -p "Note item name > " name
   fi
   name=$(printf "%s" "$name" | bw_escape_jq)
