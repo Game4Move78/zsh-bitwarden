@@ -396,7 +396,7 @@ bw_list() {
     items=$(printf "%s" "$items" | bw_group_fields)
   fi
   for (( i = 2; i <= $#jarg; i+=2)); do
-    items=$(printf "%s" "$items" | jq -ceM "[.[] | select((${jarg[$i]})?)]")
+    items=$(printf "%s" "$items" | jq -ceM "[.[] | select((${jarg[$i]})? // false)]")
   done
   # Command substitution removes newline
   printf "%s\n" "$items"
