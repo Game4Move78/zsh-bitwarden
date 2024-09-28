@@ -720,7 +720,7 @@ bw_edit_field() {
   if (( $#farg)); then
     name="${farg[-1]}"
   else
-    name=$(printf "%s" "$items" | bw_select_field <<< "$items")
+    name=$(printf "%s" "$items" | bw_select_field)
   fi
   #local path_val="[.fields[] | select(.name == \"$name\") | .value] | first"
   #local path_idx=".fields | map(.name) | index(\"$name\")"
@@ -865,7 +865,7 @@ bw_edit_password() {
   res=$(printf "%s" "$items" | bw_search \
                                  -h name -c .name \
                                  -h username -c .login.username \
-                                 -O .id -O .login.password <<< "$items")
+                                 -O .id -O .login.password)
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search args $@"
     return 1
@@ -889,7 +889,7 @@ bw_edit_note() {
   local uuid val res
   res=$(printf "%s" "$items" | bw_search \
                                  -h name -c .name \
-                                 -h notes -o .notes -O .id <<< "$items")
+                                 -h notes -o .notes -O .id)
   printf "%s" "$res" | IFS=$'\t' read -r uuid val
   if [[ -t 0 ]]; then
     val=$(printf "%s" "$val" | bw_raw_jq)
@@ -898,7 +898,7 @@ bw_edit_note() {
     val=$(</dev/stdin)
   fi
   val=$(printf "%s" "$val" | bw_escape_jq)
-  bw_get_item "$uuid" <<< "$items" | bw_edit_item_assign "$uuid" .notes "$val"
+  printf "%s" "$items" | bw_get_item "$uuid" | bw_edit_item_assign "$uuid" .notes "$val"
 }
 
 bw_create_login() {
@@ -935,7 +935,7 @@ bw_create_login() {
   val=$(printf "%s" "$val" | bw_escape_jq)
   bw_reset_cache_list
   bw get template item \
-    | jq ".name=\"${name}\" | .login={\"username\":\"${username}\", \"password\": \"$pass\"}" \
+    | jq ".name=\"${name}\" | .login.username=\"$username\" | .login.password=\"$pass\"" \
     | bw encode | bw create item | jq -r '.login.password'
 }
 
