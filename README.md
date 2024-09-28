@@ -122,3 +122,7 @@ This command finds items with either a username containing "frog" OR password co
 `--simplify` restructuring the items for concise queries.
 - `.login.username` becomes `.username` 
 - `[.fields[] | select(.name == "email") | .value] | first` becomes `.fields.email[0]`
+
+### Default header names
+
+If you don't like the default header names displayed in fzf, then either edit `default-headers.csv` or export `BW_DEFAULT_HEADERS` to your file.
