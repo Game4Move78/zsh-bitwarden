@@ -612,7 +612,7 @@ bw_group_fields() {
   jq -ceM '[.[] | . as $item | .fields? | to_entries? | .[] as $field | $item | .fields=$field]'
 }
 
-bw_field() {
+bw_field_old() {
 
   local -a sarg farg
   zparseopts -D -K -E -- \
@@ -641,26 +641,43 @@ bw_field() {
   fi
 }
 
-bw_field2() {
+bw_field() {
 
-  local -a sarg farg
+  local -a sarg farg choosearg
   zparseopts -D -K -E -- \
              {p,-clipboard}=parg \
-             {f,-field}:=farg || return
+             {f,-field}:=farg \
+             -choose=choosearg || return
 
 
   local items=$(bw_list --simplify "$@")
 
-  local res=$(printf "%s" "$items" | bw_search \
-              -h name -c .name \
-              -h fields -c '.fields | keys_unsorted | select(length > 0) | tostring' \
-              -O '.fields | to_entries | tostring')
+  local res
+  local name
 
-  res=$(printf "%s" "$res" | bw_search \
-          -h field -c '.key' \
-          -h value -o '.value | tostring')
+  if (( $#farg || $#choosearg )); then
+    if (( $#farg )); then
+      name="${farg[-1]}"
+    elif (( $#choosearg)); then
+      name=$(printf "%s" "$items" | bw_select_values '.fields | keys_unsorted | .[]' "field")
+    fi
+    res=$(printf "%s" "$items" | bw_search \
+                                   -h name -c .name \
+                                   -h "$name" -o ".fields[\"$name\"] | select(length > 0) | tostring")
+  else
+    res=$(printf "%s" "$items" | bw_search \
+                                   -h name -c .name \
+                                   -h fields -c '.fields | keys_unsorted | select(length > 0) | tostring' \
+                                   -O '.fields | to_entries | tostring')
+    res=$(printf "%s" "$res" | bw_search \
+                                 -h field -o '.key' \
+                                 -h value -o '.value | tostring')
+    printf "%s" "$res" | IFS=$'\t' read -r name res
+  fi
 
-  res=$(printf "%s" "$res" | bw_search -o .)
+
+
+  res=$(printf "%s" "$res" | bw_search -h "$name" -o .)
 
   if (( $#parg )); then
     printf "%s" "$res"
