@@ -47,13 +47,36 @@ bw_raw_jq() {
   sed -e 's/\\t/\t/g' -e 's/\\n/\n/g' -e 's/\\r/\r/g'
 }
 
+export BW_DEFAULT_HEADERS="${0:h}/default-headers.csv"
+
+bw_default_header() {
+  while IFS=$'\n' read -r line; do
+    local key=$(printf "%s" "$line" | awk -F, '{print $1}' | sed 's/^"//; s/"$//')
+    local value=$(printf "%s" "$line" | awk -F, '{print $2}' | sed 's/^"//; s/"$//')
+    if [[ "$key" == "$1" ]]; then
+      printf "%s" "$value"
+      return
+    fi
+  done < "$BW_DEFAULT_HEADERS"
+  printf "%s" "$1"
+  # case "$1" in
+  #   ".id") printf "%s" "Item ID" ;;
+  #   ".login.username"|".username") printf "%s" "Username" ;;
+  #   ".login.password"|".password") printf "%s" "Password" ;;
+  #   ".name") printf "%s" "Name" ;;
+  #   *) printf "%s" "$1"
+  # esac
+}
+
 # Takes JSON as stdin and jq paths to extract into tsv as args
 bw_table() {
 
-  local -a harg
+  local -a harg rharg
 
   zparseopts -D -K -E -- \
-             {h,-headers}+:=harg || return
+             {h,-headers}+:=harg \
+             {H,-rev-headers}+:=rharg \
+    || return
 
   if [[ "$#" == 0 ]]; then
     echo "Usage: $0 [PATH]..."
@@ -63,12 +86,20 @@ bw_table() {
   local headers=()
 
   for (( i = 1; i <= $#; i++)); do
+    local header=""
     if [ "$#harg" -ge "$(( i * 2 ))" ]; then
-      headers+=("${harg[$(( i * 2 ))]}")
+      header="${harg[$(( i * 2 ))]}"
+    elif [ "$#rharg" -ge "$(( ($# - i + 1) * 2 ))" ]; then
+      header="${rharg[$(( ($# - i + 1) * 2 ))]}"
     else
-      headers+=("${(P)i}")
+      header=$(bw_default_header "${(P)i}")
     fi
+    headers+=("$header")
   done
+
+  echo "$headers[1]" > /tmp/headers
+  echo "$headers[2]" >> /tmp/headers
+  echo "$headers[3]" >> /tmp/headers
 
   local json=$(</dev/stdin)
   # Comma-join arguments
@@ -343,11 +374,11 @@ bw_simplify() {
 }
 
 bw_list() {
-  local -a sarg sxarg jarg larg narg garg simplifyarg
+  local -a sarg sxarg jarg garg simplifyarg larg narg
   zparseopts -D -F -K -- \
              {s,-search-all}+:=sarg \
-             {-search-name,-search-user,u,-search-pass,p,-search-notes}+:=sxarg \
-             {j,-jq-filter}:=jarg \
+             {-search-name,-search-user,-search-pass,-search-note}+:=sxarg \
+             {j,-search-jq}:=jarg \
              {g,-group-fields}=garg \
              -simplify=simplifyarg \
              {l,-login}=larg \
@@ -359,25 +390,22 @@ bw_list() {
   (false; . or (\$field // \"\" | test(\"${sarg[$i]}\";\"i\")))
     )]")
   done
-  echo "$@" > /tmp/args
   for (( i = 1; i <= $#sxarg; i+=2)); do
     local jqpath=""
     case "${sxarg[$i]}" in
       "--search-name")
         jqpath=".name"
       ;;
-      "--search-user"|"-u")
+      "--search-user")
         jqpath=".login.username"
         ;;
-      "--search-pass"|"-p")
+      "--search-pass")
         jqpath=".login.password"
         ;;
       "--search-notes")
         jqpath=".login.notes"
         ;;
     esac
-    echo "$jqpath" > /tmp/jqpath
-    echo jq "[.[] | select($jqpath | test(\"${sxarg[(( $i + 1 ))]}\";\"i\")?)]" > /tmp/items
     items=$(printf "%s" "$items" | jq "[.[] | select($jqpath | test(\"${sxarg[(( $i + 1 ))]}\";\"i\")?)]")
   done
   # local items=$(bw list items --search "${sarg[-1]}")
@@ -408,16 +436,25 @@ bw_copy() {
 
 bw_tsv() {
   local -a \
+        sarg \
+        sxarg \
+        jarg \
+        garg \
+        simplifyarg \
+        larg \
+        narg \
         harg \
         parg \
         carg \
-        sarg \
-        targ \
-        garg \
-        cflarg \
-        larg \
-        narg
+        targ
   zparseopts -D -K -E -- \
+             {s,-search-all}+:=sarg \
+             {-search-name,-search-user,-search-pass,-search-note}+:=sxarg \
+             {j,-search-jq}:=jarg \
+             {g,-group-fields}=garg \
+             -simplify=simplifyarg \
+             {l,-login}=larg \
+             {n,-note}=narg \
              {h,-headers}+:=harg \
              {p,-clipboard}=parg \
              {o,c,O}+:=carg \
@@ -425,7 +462,6 @@ bw_tsv() {
   # if ! bw_unlock; then
   #   return 1
   # fi
-  echo "$sarg" > /tmp/sarg
 
   if (( !$#parg )) && (( $#targ )); then
     parg+=("-p")
@@ -436,12 +472,27 @@ bw_tsv() {
   local -a bw_table_args
   (( $#harg )) && bw_table_args+=("${harg[@]}")
 
+  local items
+  if [[ -t 0 ]]; then
+    local -a bw_list_args
+    (( $#sarg )) && bw_list_args+=("${sarg[@]}")
+    (( $#sxarg )) && bw_list_args+=("${sxarg[@]}")
+    (( $#jarg )) && bw_list_args+=("${jarg[@]}")
+    (( $#garg )) && bw_list_args+=("${garg[@]}")
+    (( $#simplifyarg )) && bw_list_args+=("${simplifyarg[@]}")
+    (( $#larg )) && bw_list_args+=("${larg[@]}")
+    (( $#narg )) && bw_list_args+=("${narg[@]}")
+    items=$(bw_list "${bw_list_args[@]}")
+  else
+    items=$(</dev/stdin)
+  fi
+
   if (( $#targ )); then
-    IFS='' res=$(bw_list "$@" | bw_table "${bw_table_args[@]}")
+    IFS='' res=$(printf "%s" "$items" | bw_table "${bw_table_args[@]}" "$@")
   else
     local -a bw_search_args
     (( $#carg )) && bw_search_args+=("${carg[@]}")
-    IFS='' res=$(bw_list "$@" | bw_search "${bw_table_args[@]}" "${bw_search_args[@]}")
+    IFS='' res=$(printf "%s" "$items" | bw_search "${bw_table_args[@]}" "${bw_search_args[@]}" "$@")
   fi
   if (( $#parg )); then
     printf "%s" "$res"
@@ -626,8 +677,8 @@ bw_field_old() {
   local fieldpath=".fields.value | select(.name == \"$name\") | .value"
 
   local res=$(printf "%s" "$items" | bw_search \
-                                       -h name -c .name \
-                                       -h "$name" -o "$fieldpath")
+                                       -c .name \
+                                       -H "$name" -o "$fieldpath")
   if (( $#parg )); then
     printf "%s" "$res"
   else
@@ -656,17 +707,18 @@ bw_field() {
       name=$(printf "%s" "$items" | bw_select_values '.fields | keys_unsorted | .[]' "field")
     fi
     res=$(printf "%s" "$items" | bw_search \
-                                   -h name -c .name \
-                                   -h "$name" -o ".fields[\"$name\"] | select(length > 0) | tostring")
+                                   -c .name \
+                                   -H "$name" -o ".fields[\"$name\"] | select(length > 0) | tostring")
   else
     res=$(printf "%s" "$items" | bw_search \
-                                   -h name -c .name \
-                                   -h fields -c '.fields | keys_unsorted | select(length > 0) | tostring' \
-                                   -O '.fields | to_entries | tostring')
+                                   -O '.fields | to_entries | tostring' \
+                                   -c .name \
+                                   -H fields -c '.fields | keys_unsorted | select(length > 0) | tostring' \
+                                   )
     res=$(printf "%s" "$res" | bw_search \
                                  -h field -o '.key' \
                                  -h value -o '.value | tostring')
-    printf "%s" "$res" | IFS=$'\t' read -r name res
+    printf "%s" "$res" | IFS=$'\t' read -r res name
   fi
 
 
@@ -728,14 +780,15 @@ bw_edit_field() {
   local path_idx=".fields.key"
   local uuid val idx res
   res=$(printf "%s" "$grp_items" | bw_search \
-                                     -h name -o .name \
-                                     -h "$name" -o "$path_val" \
-                                     -O .id -O "$path_idx")
+                                     -O .id -O "$path_idx" \
+                                     -o .name \
+                                     -H "$name" -o "$path_val" \
+                                     )
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find field $name with search args $@"
     return 1
   fi
-  printf "%s" "$res" | IFS=$'\t' read -r name val uuid idx
+  printf "%s" "$res" | IFS=$'\t' read -r uuid idx name val
   if (( $#darg)); then
     printf "%s" "$items" | bw_get_item "$uuid" | bw_edit_item "$uuid" "del(.fields[$idx])"
     return
@@ -773,13 +826,13 @@ bw_add_field() {
   fi
   local path_val="[(.fields[] | select(.name == \"$name\") | .value) // \"\"] | first"
   local res=$(printf "%s" "$items" | bw_search \
-                                       -h name -c .name \
-                                       -h "$name" -o "$path_val" -O .id)
+                                       -O .id -c .name \
+                                       -H "$name" -o "$path_val")
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search args $@"
     return 1
   fi
-  printf "%s" "$res" | IFS=$'\t' read -r val uuid
+  printf "%s" "$res" | IFS=$'\t' read -r uuid val
   if [[ -t 0 ]]; then
     vared -p "Field value > " val
   else
@@ -796,8 +849,8 @@ bw_edit_name() {
   local items=$(bw_list "$@")
   local uuid val res
   res=$(printf "%s" "$items" | bw_search \
-                                 -h name -o .name \
-                                 -h username -c .login.username \
+                                 -o .name \
+                                 -c .login.username \
                                  -O .id)
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search strings $@"
@@ -837,8 +890,8 @@ bw_edit_username() {
   local items=$(bw_list -l "$@")
   local uuid val res
   res=$(printf "%s" "$items" | bw_search \
-                                 -h name -c .name \
-                                 -h username -o .login.username \
+                                 -c .name \
+                                 -o .login.username \
                                  -O .id)
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search args $@"
@@ -863,8 +916,8 @@ bw_edit_password() {
   local items=$(bw_list -l "$@")
   local uuid val res
   res=$(printf "%s" "$items" | bw_search \
-                                 -h name -c .name \
-                                 -h username -c .login.username \
+                                 -c .name \
+                                 -c .login.username \
                                  -O .id -O .login.password)
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search args $@"
@@ -888,8 +941,8 @@ bw_edit_note() {
   local items=$(bw_list -n "$@")
   local uuid val res
   res=$(printf "%s" "$items" | bw_search \
-                                 -h name -c .name \
-                                 -h notes -o .notes -O .id)
+                                 -c .name \
+                                 -o .notes -O .id)
   printf "%s" "$res" | IFS=$'\t' read -r uuid val
   if [[ -t 0 ]]; then
     val=$(printf "%s" "$val" | bw_raw_jq)
@@ -972,9 +1025,9 @@ bw_create_note() {
 alias bwls='bw_list'
 alias bwtsv='bw_tsv'
 alias bwul='bw_unlock'
-alias bwn='bw_tsv -h name -h username -o .name -c .login.username'
-alias bwus='bw_tsv -h name -h username -c .name -o .login.username'
-alias bwpw='bw_tsv -h name -h username -h password -c .name -c .login.username -O .login.password'
+alias bwn='bw_tsv -o .name -c .login.username'
+alias bwus='bw_tsv -c .name -o .login.username'
+alias bwpw='bw_tsv -c .name -c .login.username -O .login.password'
 alias bwno='bw_tsv -c .name -o .notes'
 alias bwfl='bw_field'
 alias bwup='bw_user_pass'
