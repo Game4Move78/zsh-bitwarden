@@ -97,10 +97,6 @@ bw_table() {
     headers+=("$header")
   done
 
-  echo "$headers[1]" > /tmp/headers
-  echo "$headers[2]" >> /tmp/headers
-  echo "$headers[3]" >> /tmp/headers
-
   local json=$(</dev/stdin)
   # Comma-join arguments
   local width="$#"
@@ -275,8 +271,10 @@ bw_search() {
   # Search using bitwarden
   local items=$(</dev/stdin)
 
+  local noitems=$(printf "%s" "$items" | jq '. | length')
+
   if [ $? -ne 0 ] || [ -z "$items" ] \
-       || [ $(printf "%s" "$items" | jq '. | length') -eq 0 ]; then
+       || [ "$noitems" -eq "0" ]; then
     echo "No results found. Try '' to search all items." >&2
     return 4
   fi
@@ -718,7 +716,7 @@ bw_field() {
     res=$(printf "%s" "$res" | bw_search \
                                  -h field -o '.key' \
                                  -h value -o '.value | tostring')
-    printf "%s" "$res" | IFS=$'\t' read -r res name
+    printf "%s" "$res" | IFS=$'\t' read -r name res
   fi
 
 
