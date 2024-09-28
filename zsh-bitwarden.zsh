@@ -345,7 +345,7 @@ bw_simplify() {
 bw_list() {
   local -a sarg sxarg jarg larg narg garg simplifyarg
   zparseopts -D -F -K -- \
-             {s,-search}+:=sarg \
+             {s,-search-all}+:=sarg \
              {-search-name,-search-user,u,-search-pass,p,-search-notes}+:=sxarg \
              {j,-jq-filter}:=jarg \
              {g,-group-fields}=garg \
@@ -359,6 +359,7 @@ bw_list() {
   (false; . or (\$field // \"\" | test(\"${sarg[$i]}\";\"i\")))
     )]")
   done
+  echo "$@" > /tmp/args
   for (( i = 1; i <= $#sxarg; i+=2)); do
     local jqpath=""
     case "${sxarg[$i]}" in
@@ -375,6 +376,8 @@ bw_list() {
         jqpath=".login.notes"
         ;;
     esac
+    echo "$jqpath" > /tmp/jqpath
+    echo jq "[.[] | select($jqpath | test(\"${sxarg[(( $i + 1 ))]}\";\"i\")?)]" > /tmp/items
     items=$(printf "%s" "$items" | jq "[.[] | select($jqpath | test(\"${sxarg[(( $i + 1 ))]}\";\"i\")?)]")
   done
   # local items=$(bw list items --search "${sarg[-1]}")
@@ -418,24 +421,15 @@ bw_tsv() {
              {h,-headers}+:=harg \
              {p,-clipboard}=parg \
              {o,c,O}+:=carg \
-             {s,-search}+:=sarg \
-             {t,-table}=targ \
-             {g,-group-fields}=garg \
-             {l,-login}=larg \
-             {n,-note}=narg || return
+             {t,-table}=targ || return
   # if ! bw_unlock; then
   #   return 1
   # fi
+  echo "$sarg" > /tmp/sarg
 
   if (( !$#parg )) && (( $#targ )); then
     parg+=("-p")
   fi
-
-  local -a bw_list_args
-  (( $#sarg)) && bw_list_args+=("${sarg[@]}")
-  (( $#garg)) && bw_list_args+=("-g")
-  (( $#larg)) && bw_list_args+=("-l")
-  (( $#narg)) && bw_list_args+=("-n")
 
   local res
 
@@ -443,11 +437,11 @@ bw_tsv() {
   (( $#harg )) && bw_table_args+=("${harg[@]}")
 
   if (( $#targ )); then
-    IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_table "${bw_table_args[@]}" $@)
+    IFS='' res=$(bw_list "$@" | bw_table "${bw_table_args[@]}")
   else
     local -a bw_search_args
     (( $#carg )) && bw_search_args+=("${carg[@]}")
-    IFS='' res=$(bw_list "${bw_list_args[@]}" | bw_search "${bw_table_args[@]}" "${bw_search_args[@]}")
+    IFS='' res=$(bw_list "$@" | bw_search "${bw_table_args[@]}" "${bw_search_args[@]}")
   fi
   if (( $#parg )); then
     printf "%s" "$res"
