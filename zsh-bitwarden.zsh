@@ -631,7 +631,9 @@ bw_field() {
   #local fieldpath="[.fields[] | select(.name == \"$name\") | .value] | first"
   local fieldpath=".fields.value | select(.name == \"$name\") | .value"
 
-  local res=$(printf "%s" "$items" | bw_search -c .name -o "$fieldpath")
+  local res=$(printf "%s" "$items" | bw_search \
+                                       -h name -c .name \
+                                       -h "$name" -o "$fieldpath")
   if (( $#parg )); then
     printf "%s" "$res"
   else
