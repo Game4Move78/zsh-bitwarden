@@ -402,7 +402,8 @@ bw_unsimplify() {
   }')
   local uuid=$(printf "%s" "$item" | jq -rceM ".id")
   local old_item
-  if [[ "$uuid" -eq "null" ]]; then
+  echo "$uuid" > /tmp/testme
+  if [[ "$uuid" == "null" ]]; then
     old_item=$(bw_template)
   else
     old_item=$(bw_list_cache | bw_get_item "$uuid")
@@ -784,7 +785,7 @@ bw_edit_json() {
   local item=$(</dev/stdin)
   local uuid=$(printf "%s" "$item" | jq -rceM ".id")
   local code=$(printf "%s" "$item" | bw encode)
-  if [[ "$uuid" -eq "null" ]]; then
+  if [[ "$uuid" == "null" ]]; then
     printf "%s" "$code" | bw create item
   else
     printf "%s" "$code" | bw edit item "$uuid"
@@ -1093,6 +1094,23 @@ bw_json() {
 
 }
 
+bw_init_file() {
+  local itemfile=$(mktemp -p "$BW_JSON_DIRECTORY")
+  chmod 600 "$itemfile"
+  cat > "$itemfile"
+  printf "%s" "$itemfile"
+}
+
+bw_edit_file() {
+  local modtime_before=$(stat -c %Y "$1")
+  $EDITOR "$1"
+  local modtime_after=$(stat -c %Y "$1")
+  if [[ "$modtime_before" -eq "$modtime_after" ]]; then
+    shred -u "$itemfile"
+    return 1
+  fi
+}
+
 bw_json_edit() {
   if ! bw_unlock_read; then
     return 1
@@ -1112,10 +1130,11 @@ bw_json_edit() {
   else
     item=$(bw_json "$@" "${simplifyarg[@]}")
   fi
-  local itemfile=$(mktemp -p "$BW_JSON_DIRECTORY")
-  chmod 600 "$itemfile"
-  printf "%s" "$item" > "$itemfile"
-  $EDITOR "$itemfile"
+  local itemfile=$(printf "%s" "$item" | bw_init_file)
+  bw_edit_file "$itemfile"
+  if [[ $? -ne 0 ]]; then
+    return 1
+  fi
   item=$(cat "$itemfile")
   shred -u "$itemfile"
   if (( $#simplifyarg )); then
