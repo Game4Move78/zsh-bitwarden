@@ -100,8 +100,6 @@ When this command is in the zshrc file, it will set the `ZSH_BW_CACHE*` environm
 
 ```
 export ZSH_BW_CACHE="/run/user/$UID/zsh-bitwarden"
-export ZSH_BW_CACHE_LIST="$ZSH_BW_CACHE/bw-list-cache.gpg"
-export ZSH_BW_CACHE_SESSION="$ZSH_BW_CACHE/bw-session.gpg"
 mkdir -p "$ZSH_BW_CACHE"
 chmod 700 "$ZSH_BW_CACHE"
 ```

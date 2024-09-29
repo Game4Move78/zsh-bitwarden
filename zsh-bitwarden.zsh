@@ -300,8 +300,6 @@ bw_search() {
 
 bw_enable_cache() {
   export ZSH_BW_CACHE="/run/user/$UID/zsh-bitwarden"
-  export ZSH_BW_CACHE_LIST="$ZSH_BW_CACHE/bw-list-cache.gpg"
-  export ZSH_BW_CACHE_SESSION="$ZSH_BW_CACHE/bw-session.gpg"
   mkdir -p "$ZSH_BW_CACHE"
   chmod 700 "$ZSH_BW_CACHE"
 }
@@ -309,13 +307,11 @@ bw_enable_cache() {
 bw_disable_cache() {
   rm -rf "$ZSH_BW_CACHE"
   unset ZSH_BW_CACHE
-  unset ZSH_BW_CACHE_LIST
-  unset ZSH_BW_CACHE_SESSION
 }
 
 bw_reset_cache_list() {
   if [[ -n "ZSH_BW_CACHE_LIST" ]]; then
-    rm -f "$ZSH_BW_CACHE_LIST"
+    rm -f "$ZSH_BW_CACHE/bw-list-cache.gpg"
   fi
 }
 
@@ -330,7 +326,9 @@ bw_unlock() {
     if BW_SESSION=$(bw unlock --raw); then
       export BW_SESSION="$BW_SESSION"
       if [[ -n "$ZSH_BW_CACHE" ]]; then
-        printf "%s" "$BW_SESSION" | gpg --yes --encrypt --default-recipient-self --output "$ZSH_BW_CACHE_SESSION"
+        touch "$ZSH_BW_CACHE/bw-session.gpg"
+        chmod 600 "$ZSH_BW_CACHE/bw-session.gpg"
+        printf "%s" "$BW_SESSION" | gpg --yes --encrypt --default-recipient-self --output "$ZSH_BW_CACHE/bw-session.gpg"
       fi
     else
       return 1
@@ -339,7 +337,7 @@ bw_unlock() {
 }
 
 bw_unlock_read() {
-  if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE_SESSION" ]] && BW_SESSION=$(gpg --quiet --decrypt "$ZSH_BW_CACHE_SESSION" 2> /dev/null); then
+  if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE/bw-session.gpg" ]] && BW_SESSION=$(gpg --quiet --decrypt "$ZSH_BW_CACHE/bw-session.gpg" 2> /dev/null); then
     export BW_SESSION="$BW_SESSION"
     return
   fi
@@ -348,7 +346,7 @@ bw_unlock_read() {
 
 bw_list_cache() {
 
-  if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE_LIST" ]] && gpg --quiet --decrypt "$ZSH_BW_CACHE_LIST" 2> /dev/null; then
+  if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE/bw-list-cache.gpg" ]] && gpg --quiet --decrypt "$ZSH_BW_CACHE/bw-list-cache.gpg" 2> /dev/null; then
     return
   fi
   if ! bw_unlock_read; then
@@ -356,7 +354,9 @@ bw_list_cache() {
   fi
   local items=$(bw list items)
   if [[ -n "$ZSH_BW_CACHE" ]]; then
-    printf "%s" "$items" | gpg --yes --encrypt --default-recipient-self --output "$ZSH_BW_CACHE_LIST"
+    touch "$ZSH_BW_CACHE/bw-list-cache.gpg"
+    chmod 600 "$ZSH_BW_CACHE/bw-list-cache.gpg"
+    printf "%s" "$items" | gpg --yes --encrypt --default-recipient-self --output "$ZSH_BW_CACHE/bw-list-cache.gpg" || rm "$ZSH_BW_CACHE/bw-list-cache.gpg"
   fi
   printf "%s" "$items"
 }
