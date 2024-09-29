@@ -959,8 +959,6 @@ bw_create_note() {
              | bw_request POST /object/item | jq -r '.id')
 }
 
-export BW_JSON_DIRECTORY="${0:h}"
-
 bw_json() {
 
   if ! bw_unlock; then
@@ -978,7 +976,7 @@ bw_json() {
 }
 
 bw_init_file() {
-  local itemfile=$(mktemp -p "$BW_JSON_DIRECTORY")
+  local itemfile=$(mktemp)
   chmod 600 "$itemfile"
   cat > "$itemfile"
   printf "%s" "$itemfile"
