@@ -1088,7 +1088,7 @@ bw_json_edit() {
   item=$(cat "$itemfile")
   shred -u "$itemfile"
   if (( $#simplifyarg )); then
-    item=$(printf "%s" "$item" | bw_simplify)
+    item=$(printf "%s" "$item" | bw_unsimplify)
   fi
   printf "%s" "$item" | bw_edit_json
   bw_reset_cache_list
