@@ -78,7 +78,7 @@ local fieldpath=".fields[\"$fieldname\"] | select(length > 0) | join(\", \")""
 bwtsv --simplify -pls wikipedia -c .name -c .username -H "$fieldname" -o "$fieldpath" | bw_tsv -h "$fieldname" -o '.'
 ```
 
-Equivalent code but using piped bw_tsv to deal with duplicates.
+Equivalent code but using piped bw_tsv to select from duplicates.
 
 ### TSV Table
 
