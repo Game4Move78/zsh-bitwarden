@@ -44,7 +44,7 @@ bw_escape_jq() {
 }
 
 bw_raw_jq() {
-  sed -e 's/\\t/\t/g' -e 's/\\n/\n/g' -e 's/\\r/\r/g'
+  sed -e 's/\\t/\t/g' -e 's/\\n/\n/g' -e 's/\\r/\r/g' -e 's/\\\\/\\/g'
 }
 
 export BW_DEFAULT_HEADERS="${0:h}/default-headers.csv"
@@ -89,8 +89,8 @@ bw_table() {
     local header=""
     if [ "$#harg" -ge "$(( i * 2 ))" ]; then
       header="${harg[$(( i * 2 ))]}"
-    elif [ "$#rharg" -ge "$(( ($# - i + 1) * 2 ))" ]; then
-      header="${rharg[$(( ($# - i + 1) * 2 ))]}"
+    elif [ "1" -le "$(( (i - $#) * 2 + $#rharg ))" ]; then
+      header="${rharg[$(( (i - $#) * 2 + $#rharg ))]}"
     else
       header=$(bw_default_header "${(P)i}")
     fi
@@ -108,8 +108,7 @@ bw_table() {
   # Construct tsv with values selected using args
   local jq_output=$(
     printf "%s" "$json" \
-    | jq -ceM ".[] | [$keys] | select(all(.[]; . != null) and length == $width)" 2> /dev/null \
-    | jq -r "@tsv" \
+    | jq -rceM ".[] | [$keys] | select(all(.[]; . != null) and length == $width) | @tsv" 2> /dev/null
   )
 
   if [[ -z "$jq_output" ]]; then
@@ -321,10 +320,6 @@ bw_reset_cache_list() {
 }
 
 bw_unlock() {
-  if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE_SESSION" ]] && BW_SESSION=$(gpg --quiet --decrypt "$ZSH_BW_CACHE_SESSION" 2> /dev/null); then
-    export BW_SESSION="$BW_SESSION"
-    return
-  fi
   if [ -z "$BW_SESSION" ] || [ "$(bw status 2> /dev/null | jq -r '.status')" = "locked" ]; then
     unset BW_SESSION #
     if ! _bw_test_subshell; then
@@ -335,7 +330,7 @@ bw_unlock() {
     if BW_SESSION=$(bw unlock --raw); then
       export BW_SESSION="$BW_SESSION"
       if [[ -n "$ZSH_BW_CACHE" ]]; then
-        printf "%s" "$ZSH_BW_CACHE_SESSION" | gpg --yes --encrypt --default-recipient-self --output "$ZSH_BW_CACHE_SESSION"
+        printf "%s" "$BW_SESSION" | gpg --yes --encrypt --default-recipient-self --output "$ZSH_BW_CACHE_SESSION"
       fi
     else
       return 1
@@ -343,12 +338,20 @@ bw_unlock() {
   fi
 }
 
+bw_unlock_read() {
+  if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE_SESSION" ]] && BW_SESSION=$(gpg --quiet --decrypt "$ZSH_BW_CACHE_SESSION" 2> /dev/null); then
+    export BW_SESSION="$BW_SESSION"
+    return
+  fi
+  bw_unlock
+}
+
 bw_list_cache() {
 
   if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE_LIST" ]] && gpg --quiet --decrypt "$ZSH_BW_CACHE_LIST" 2> /dev/null; then
     return
   fi
-  if ! bw_unlock; then
+  if ! bw_unlock_read; then
     return 1
   fi
   local items=$(bw list items)
@@ -360,7 +363,7 @@ bw_list_cache() {
 
 bw_simplify() {
 
-  jq "[.[] | {
+  jq -ceM "[.[] | {
      id: .id,
      name: .name,
      notes: .notes,
@@ -369,6 +372,26 @@ bw_simplify() {
      fields: ((.fields | group_by(.name) | map({(.[0].name): map(.value)}) | add )? // {})
   }]"
 
+}
+
+bw_unsimplify() {
+  local item=$(jq -ceM '{
+  id: .id,
+  name: .name,
+  notes: .notes,
+  fields: [
+    .fields | to_entries[] |
+    .value[] as $v |
+    {name: .key, value: $v, type: 0, linkedId: null}
+  ],
+  login: {
+    username: .username,
+    password: .password
+  }
+  }')
+  local uuid=$(printf "%s" "$item" | jq -rceM ".id")
+  local old_item=$(bw_list_cache | bw_get_item "$uuid")
+  printf "%s" "$old_item $new_item" | jq -ceMs "add"
 }
 
 bw_list() {
@@ -383,7 +406,7 @@ bw_list() {
              {n,-note}=narg || return
   local items=$(bw_list_cache)
   for (( i = 2; i <= $#sarg; i+=2)); do
-    items=$(printf "%s" "$items" | jq "[.[] | select(
+    items=$(printf "%s" "$items" | jq -ceM "[.[] | select(
    reduce [ .id, .name, .notes, .login.username, .login.password, (.fields[]?.value) ][] as \$field
   (false; . or (\$field // \"\" | test(\"${sarg[$i]}\";\"i\")))
     )]")
@@ -404,7 +427,7 @@ bw_list() {
         jqpath=".login.notes"
         ;;
     esac
-    items=$(printf "%s" "$items" | jq "[.[] | select($jqpath | test(\"${sxarg[(( $i + 1 ))]}\";\"i\")?)]")
+    items=$(printf "%s" "$items" | jq -ceM "[.[] | select($jqpath | test(\"${sxarg[(( $i + 1 ))]}\";\"i\")?)]")
   done
   # local items=$(bw list items --search "${sarg[-1]}")
   if (( $#larg || $#narg)); then
@@ -442,6 +465,7 @@ bw_tsv() {
         larg \
         narg \
         harg \
+        rarg \
         parg \
         carg \
         targ
@@ -454,14 +478,12 @@ bw_tsv() {
              {l,-login}=larg \
              {n,-note}=narg \
              {h,-headers}+:=harg \
+             {r,-raw}=rarg \
              {p,-clipboard}=parg \
              {o,c,O}+:=carg \
              {t,-table}=targ || return
-  # if ! bw_unlock; then
-  #   return 1
-  # fi
 
-  if (( !$#parg )) && (( $#targ )); then
+  if (( !$#parg )) && { (( $#targ )) || ! [[ -t 1 ]]; }; then
     parg+=("-p")
   fi
 
@@ -491,6 +513,9 @@ bw_tsv() {
     local -a bw_search_args
     (( $#carg )) && bw_search_args+=("${carg[@]}")
     IFS='' res=$(printf "%s" "$items" | bw_search "${bw_table_args[@]}" "${bw_search_args[@]}" "$@")
+  fi
+  if (( $#rarg )); then
+    res=$(printf "%s" "$res" | bw_raw_jq)
   fi
   if (( $#parg )); then
     printf "%s" "$res"
@@ -599,7 +624,7 @@ bw_tsv_helper() {
 
 bw_user_pass() {
   local -a sarg
-  if ! bw_unlock; then
+  if ! bw_unlock_read; then
     return 1
   fi
   local userpass=$(bw_list -l "$@" | bw_search -c .name -o .login.username -O .login.password)
@@ -686,8 +711,9 @@ bw_field_old() {
 
 bw_field() {
 
-  local -a sarg farg choosearg
+  local -a rarg parg farg choosearg
   zparseopts -D -K -E -- \
+             {r,-raw}=rarg \
              {p,-clipboard}=parg \
              {f,-field}:=farg \
              -choose=choosearg || return
@@ -696,7 +722,9 @@ bw_field() {
   local items=$(bw_list --simplify "$@")
 
   local res
+  local item
   local name
+  local uuid
 
   if (( $#farg || $#choosearg )); then
     if (( $#farg )); then
@@ -704,23 +732,24 @@ bw_field() {
     elif (( $#choosearg)); then
       name=$(printf "%s" "$items" | bw_select_values '.fields | keys_unsorted | .[]' "field")
     fi
-    res=$(printf "%s" "$items" | bw_search \
+    uuid=$(printf "%s" "$items" | bw_search \
+                                   -O .id \
                                    -c .name \
-                                   -H "$name" -o ".fields[\"$name\"] | select(length > 0) | tostring")
+                                   -H "$name" -c ".fields[\"$name\"] | select(length > 0) | join(\", \")")
+    item=$(printf "%s" "$items" | bw_get_item "$uuid")
   else
-    res=$(printf "%s" "$items" | bw_search \
-                                   -O '.fields | to_entries | tostring' \
+    uuid=$(printf "%s" "$items" | bw_search \
+                                   -O '.id' \
                                    -c .name \
-                                   -H fields -c '.fields | keys_unsorted | select(length > 0) | tostring' \
+                                   -H fields -c ".fields | keys_unsorted | select(length > 0) | join(\", \")" \
                                    )
-    res=$(printf "%s" "$res" | bw_search \
+    item=$(printf "%s" "$items" | bw_get_item "$uuid")
+    name=$(printf "%s" "$item" | jq -ceM ".fields | to_entries" | bw_search \
                                  -h field -o '.key' \
-                                 -h value -o '.value | tostring')
-    printf "%s" "$res" | IFS=$'\t' read -r name res
+                                 -h value -c '.value | join(", ")')
   fi
 
-
-
+  res=$(printf "%s" "$item" | jq -ceM ".fields[\"$name\"]")
   res=$(printf "%s" "$res" | bw_search -h "$name" -o .)
 
   if (( $#parg )); then
@@ -732,7 +761,13 @@ bw_field() {
 }
 
 bw_get_item() {
-  jq -ceM ".[] | select(.id == \"$1\")"
+  jq -ceM ".[] | select(.id == \"$1\")$2"
+}
+
+bw_edit_json() {
+  local item=$(</dev/stdin)
+  local uuid=$(printf "%s" "$item" | jq -rceM ".id")
+  printf "%s" "$item" | bw encode | bw edit item "$uuid"
 }
 
 bw_edit_item() {
@@ -754,14 +789,14 @@ bw_edit_item_append() {
 
 bw_edit_field() {
 
-  local -a sarg farg rarg darg
+  local -a narg rarg darg farg
   zparseopts -D -K -E -- \
              {n,-new}=narg \
              {r,-rename}=rarg \
              {d,-delete}=darg \
              {f,-field}:=farg || return
 
-  if ! bw_unlock; then
+  if ! bw_unlock_read; then
     return 1
   fi
   local items=$(bw_list "$@")
@@ -907,7 +942,6 @@ bw_edit_username() {
 }
 
 bw_edit_password() {
-  local -a sarg
   if ! bw_unlock; then
     return 1
   fi
@@ -986,13 +1020,13 @@ bw_create_login() {
   val=$(printf "%s" "$val" | bw_escape_jq)
   bw_reset_cache_list
   bw get template item \
-    | jq ".name=\"${name}\" | .login.username=\"$username\" | .login.password=\"$pass\"" \
-    | bw encode | bw create item | jq -r '.login.password'
+    | jq -ceM ".name=\"${name}\" | .login.username=\"$username\" | .login.password=\"$pass\"" \
+    | bw encode | bw create item | jq -rceM '.login.password'
 }
 
 bw_create_note() {
 
-  local -a sarg narg uarg
+  local -a narg
   zparseopts -D -F -K -- \
              {n,-name}:=narg || return
 
@@ -1020,6 +1054,48 @@ bw_create_note() {
            | bw encode | bw create item | jq -r '.id')
 }
 
+export BW_JSON_DIRECTORY="${0:h}"
+
+bw_json() {
+
+  if ! bw_unlock_read; then
+    return 1
+  fi
+
+  local items=$(bw_list "$@")
+
+  local uuid=$(printf "%s" "$items" | bwtsv -p -O '.id' -c .name)
+
+  local item=$(printf "%s" "$items" | bw_get_item "$uuid")
+
+  printf "%s" "$item" | jq
+
+}
+
+bw_json_edit() {
+  if ! bw_unlock_read; then
+    return 1
+  fi
+  local -a simplifyarg
+  zparseopts -D -K -E -- \
+             -simplify=simplifyarg || return
+
+  local item=$(bw_json "$@" "${simplifyarg[@]}")
+  local itemfile=$(mktemp -p "$BW_JSON_DIRECTORY")
+  chmod 600 "$itemfile"
+  printf "%s" "$item" > "$itemfile"
+  $EDITOR "$itemfile"
+  item=$(cat "$itemfile")
+  shred -u "$itemfile"
+  if (( $#simplifyarg )); then
+    item=$(printf "%s" "$item" | bw_simplify)
+  fi
+  printf "%s" "$item" | bw_edit_json
+  bw_reset_cache_list
+}
+
+alias bwjs='bw_json'
+alias bwjse='bw_json_edit'
 alias bwls='bw_list'
 alias bwtsv='bw_tsv'
 alias bwul='bw_unlock'

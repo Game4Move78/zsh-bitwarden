@@ -11,6 +11,9 @@ See [INSTALL.md](INSTALL.md).
 | Command    | Description                 |
 |------------|-----------------------------|
 | `bwul`     | unlock the vault            |
+| `bwjs`     | print item json             |
+| `bwjse`    | edit item json in $EDITOR   |
+| `bwtsv -t` | print tsv table             |
 | `bwtsv`    | select tsv data             |
 | `bwtsv -t` | print tsv table             |
 | `bwg`      | alphanum + special password |
@@ -126,3 +129,4 @@ This command finds items with either a username containing "frog" OR password co
 ### Default header names
 
 If you don't like the default header names displayed in fzf, then either edit `default-headers.csv` or export `BW_DEFAULT_HEADERS` to your file.
+
