@@ -74,7 +74,7 @@ By using the JQ path `$fieldpath` that selects the field named "email", this exa
 
 ```zsh
 local fieldname="email"
-local fieldpath=".fields[\"$fieldname\"] | select(length > 0) | join(\", \")""
+local fieldpath=".fields[\"$fieldname\"] | select(length > 0) | join(\", \")"
 bwtsv --simplify -pls wikipedia -c .name -c .username -H "$fieldname" -o "$fieldpath" | bw_tsv -h "$fieldname" -o '.'
 ```
 
