@@ -104,6 +104,8 @@ mkdir -p "$ZSH_BW_CACHE"
 chmod 700 "$ZSH_BW_CACHE"
 ```
 
+The [Vault Management API](https://bitwarden.com/help/vault-management-api/) seems to be another alternative, but `/unlock` doesn't seem to work.
+
 ### JQ search
 
 ```
