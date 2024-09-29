@@ -323,18 +323,33 @@ bw_request() {
   printf "%s" "$res"
 }
 
-bw_unlock() {
+bw_status() {
+  local res
+  if ! res=$(bw_request GET '/status'); then
+    return $?
+  fi
+  res=$(printf "%s" "$res" | jq -rceM '.template.status')
+  printf "%s\n" "$res"
+  if [[ "$res" == "unlocked" ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+bw_serve() {
   if ! pgrep -f "bw serve" > /dev/null 2>&1; then
     nohup bw serve > /dev/null 2> /dev/null &
     sleep 2
   fi
+}
 
-  local bw_status
-  if ! bw_status=$(bw_request GET '/status'); then
-    return 1
-  fi
-  bw_status=$(printf "%s" "$bw_status" | jq -rceM '.template.status')
-  if [[ "$bw_status" == "unlocked" ]]; then
+bw_unlock() {
+  bw_serve
+
+  local st
+  if st=$(bw_status); then
+    printf "%s" "$st"
     return
   fi
 
@@ -343,13 +358,29 @@ bw_unlock() {
   echo -n "Enter your master password: " >&2
 
   if ! read -s pass; then
+    echo
     return 1
   fi
+
+  echo
   pass=$(printf "%s" "$pass" | awk '{print "{\"password\":\"" $0 "\"}"}')
-  if ! printf "%s" "$pass" | bw_request POST /unlock > /dev/null; then
-     return 1
+  local res
+  res=$(printf "%s" "$pass" | bw_request POST /unlock)
+  exitcode=$?
+  printf "%s" "$res" | jq -rceM .title
+  return exitcode
+}
+
+bw_lock() {
+  bw_serve
+
+  local st
+  if ! st=$(bw_status); then
+    printf "%s" "$st"
+    return
   fi
-  printf "\nVault unlocked\n"
+
+  bw_request POST /lock | jq -rceM .title
 }
 
 bw_template() {
@@ -1024,7 +1055,9 @@ alias bwjs='bw_json'
 alias bwjse='bw_json_edit'
 alias bwls='bw_list'
 alias bwtsv='bw_tsv'
+alias bwst='bw_status'
 alias bwul='bw_unlock'
+alias bwlk='bw_lock'
 alias bwn='bw_tsv -o .name'
 alias bwus='bw_tsv -c .name -o .login.username'
 alias bwpw='bw_tsv -c .name -c .login.username -O .login.password'
