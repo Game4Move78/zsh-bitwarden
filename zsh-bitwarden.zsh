@@ -344,10 +344,45 @@ bw_request() {
   printf "%s" "$res"
 }
 
+bw_request_params() {
+  if [[ $# -eq 0 ]]; then
+    return
+  fi
+
+  printf "?%s=%s" "$1" "$2"
+
+  local j
+  for (( i=3, j=4; i <= $#; i += 2, j += 2)); do
+    printf "&%s=%s" "${(P)i}" "${(P)j}"
+  done
+}
+
+bw_generate() {
+  local -a larg uarg sarg narg lengtharg
+  zparseopts -D -F -K -- \
+             {l,-lowercase}=larg \
+             {u,-uppercase}=uarg \
+             {s,-special}=sarg \
+             {n,-number}=narg \
+             -length:=lengtharg || return
+
+  local -a param_list
+  (( $#larg)) && param_list+=( "lowercase" "true" )
+  (( $#uarg)) && param_list+=( "uppercase" "true" )
+  (( $#sarg)) && param_list+=( "special" "true" )
+  (( $#narg)) && param_list+=( "number" "true" )
+  (( $#lengtharg)) && param_list+=( "length" "${lengtharg[-1]}" )
+
+  local params=$(bw_request_params "${param_list[@]}")
+
+  bw_request_path GET "/generate$params" .data
+}
+
 bw_status() {
   local res
   res=$(bw_request GET '/status' | jq -rceM '.template.status')
   _bw_pipefail ${pipestatus[@]} || return $?
+  # res=$(bw_request_path GET /status .template.status)
   printf "%s\n" "$res" >&2
   if [[ "$res" == "unlocked" ]]; then
     return 0
@@ -413,9 +448,7 @@ bw_template() {
 
 bw_list_cache() {
 
-  if ! bw_unlock; then
-    return 1
-  fi
+  bw_unlock || return $?
 
   local res
   res=$(bw_request GET /list/object/items) || return $?
@@ -594,9 +627,8 @@ bw_tsv() {
 
 bw_user_pass() {
   local -a sarg
-  if ! bw_unlock; then
-    return 1
-  fi
+
+  bw_unlock || return $?
 
   local userpass
   userpass=$(bw_list -l "$@" | bw_search -c .name -o .login.username -O .login.password)
@@ -748,9 +780,8 @@ bw_edit_field() {
              {d,-delete}=darg \
              {f,-field}:=farg || return
 
-  if ! bw_unlock; then
-    return 1
-  fi
+  bw_unlock || return $?
+
   local items grp_items name
   items=$(bw_list "$@") || return $?
   grp_items=$(printf "%s" "$items" | bw_group_fields) || return $?
@@ -799,9 +830,9 @@ bw_add_field() {
   local -a farg
   zparseopts -D -K -E -- \
              {f,-field}:=farg || return
-  if ! bw_unlock; then
-    return 1
-  fi
+
+  bw_unlock || return $?
+
   local items=$(bw_list "$@")
   local name val
   if (( $#farg)); then
@@ -828,9 +859,9 @@ bw_add_field() {
 }
 
 bw_edit_name() {
-  if ! bw_unlock; then
-    return 1
-  fi
+
+  bw_unlock || return $?
+
   local items=$(bw_list "$@")
   local uuid val res
   res=$(printf "%s" "$items" | bw_search \
@@ -870,9 +901,9 @@ bw_filter_type() {
 }
 
 bw_edit_username() {
-  if ! bw_unlock; then
-    return 1
-  fi
+
+  bw_unlock || return $?
+
   local items=$(bw_list -l "$@")
   local uuid val res
   res=$(printf "%s" "$items" | bw_search \
@@ -896,9 +927,9 @@ bw_edit_username() {
 }
 
 bw_edit_password() {
-  if ! bw_unlock; then
-    return 1
-  fi
+
+  bw_unlock || return $?
+
   local items=$(bw_list -l "$@")
   local uuid val res
   res=$(printf "%s" "$items" | bw_search \
@@ -933,9 +964,9 @@ bw_edit_password() {
 }
 
 bw_edit_note() {
-  if ! bw_unlock; then
-    return 1
-  fi
+
+  bw_unlock || return $?
+
   local items=$(bw_list -n "$@")
   local uuid val res
   res=$(printf "%s" "$items" | bw_search \
@@ -960,9 +991,8 @@ bw_create_login() {
              {n,-name}:=narg \
              {u,-username}:=uarg || return
 
-  if ! bw_unlock; then
-    return 1
-  fi
+  bw_unlock || return $?
+
   local name username uuid
   if (( $#narg)); then
     name=$(printf "%s" "$name" | bw_raw_jq)
@@ -980,7 +1010,7 @@ bw_create_login() {
   username=$(printf "%s" "$username" | bw_escape_jq)
   local pass
   if [ -t 0 ] ; then
-    pass="$(bw generate -ulns --length 21)"
+    pass="$(bw_generate -ulns --length 21)"
   else
     pass="$(</dev/stdin)"
   fi
@@ -1001,9 +1031,8 @@ bw_create_note() {
   zparseopts -D -F -K -- \
              {n,-name}:=narg || return
 
-  if ! bw_unlock; then
-    return 1
-  fi
+  bw_unlock || return $?
+
   local name val uuid
   if (( $#narg)); then
     name="${narg[-1]}"
@@ -1031,9 +1060,7 @@ bw_create_note() {
 
 bw_json() {
 
-  if ! bw_unlock; then
-    return 1
-  fi
+  bw_unlock || return $?
 
   items=$(bw_list "$@") || return $?
 
@@ -1061,9 +1088,7 @@ bw_edit_file() {
 }
 
 bw_json_edit() {
-  if ! bw_unlock; then
-    return 1
-  fi
+  bw_unlock || return $?
   local -a simplifyarg narg
   zparseopts -D -K -E -- \
              {n,-new}=narg \
@@ -1095,6 +1120,14 @@ bw_json_edit() {
   # bw_reset_cache_list
 }
 
+bw_request_path() {
+  bw_unlock || return $?
+  local method=$1 endpoint=$2 jqpath=$3 res exitcode
+  res=$(bw_request "$method" "$endpoint" | jq -rceM "$jqpath")
+  _bw_pipefail ${pipestatus[@]} || return $?
+  printf "%s\n" "$res"
+}
+
 alias bwjs='bw_json'
 alias bwjse='bw_json_edit'
 alias bwls='bw_list'
@@ -1114,9 +1147,7 @@ alias bwpwe='bw_edit_password'
 alias bwnoe='bw_edit_note'
 alias bwfle='bw_edit_field'
 alias bwfla='bw_add_field'
-# alias bwg='bw_unlock && bw generate -ulns --length 21'
-# alias bwgs='bw_unlock && bw generate -uln --length 21'
-alias bwg='bw_unlock && bw_request GET "/generate?length=21&uppercase=true&lowercase=true&number=true&special=true"'
-alias bwgs='bw_unlock && bw_request GET "/generate?length=21&uppercase=true&lowercase=true&number=true&special=false"'
+alias bwg='bw_generate -ulns --length 21'
+alias bwgs='bw_generate -uln --length 21'
 alias bwlc='bw_create_login'
 alias bwnc='bw_create_note'
