@@ -304,8 +304,9 @@ bw_request() {
   if ! [[ -t 0 ]]; then
     data_args+=("-d" "$(</dev/stdin)")
   fi
-  # local res=$(curl -sX "$method" "http://localhost:8087$endpoint" -H 'accept: application/json' -H 'Content-Type: application/json' "${data_args[@]}") || return $?
-  local res=$(wget --method="$method" --header="accept: application/json" --header="Content-Type: application/json" --body-data="${data_args[@]}" -qO- "http://localhost:8087$2") || return $?
+  local res=$(curl -sX "$method" "http://localhost:8087$endpoint" -H 'accept: application/json' -H 'Content-Type: application/json' "${data_args[@]}") || return $?
+  # local res=$(wget --method="$method" --header="accept: application/json" --header="Content-Type: application/json" --body-data="${data_args[@]}" -qO- "http://localhost:8087$endpoint") || return $?
+  echo "$res" > /tmp/res
   printf "%s" "$res" | jq empty > /dev/null 2>&1
   if [[ $? -ne 0 ]]; then
     printf "%s\n" "$res" >&2
@@ -329,7 +330,12 @@ bw_unlock() {
     sleep 2
   fi
 
-  local bw_status=$(bw_request GET '/status' | jq -rceM '.template.status')
+  local bw_status
+  if ! bw_status=$(bw_request GET '/status'); then
+    return 1
+  fi
+  echo "$bw_status" > /tmp/debug
+  bw_status=$(printf "%s" "$bw_status" | jq -rceM '.template.status')
   if [[ "$bw_status" == "unlocked" ]]; then
     return
   fi
@@ -342,6 +348,7 @@ bw_unlock() {
     return 1
   fi
   pass=$(printf "%s" "$pass" | awk '{print "{\"password\":\"" $0 "\"}"}')
+  echo "$pass" > /tmp/debug
   if ! printf "%s" "$pass" | bw_request POST /unlock > /dev/null; then
      return 1
   fi
