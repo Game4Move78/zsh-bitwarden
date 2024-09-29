@@ -969,9 +969,7 @@ bw_json() {
 
   local uuid=$(printf "%s" "$items" | bw_tsv -r -p -O '.id' -c .name)
 
-  local item=$(printf "%s" "$items" | bw_get_item "$uuid")
-
-  printf "%s" "$item" | jq
+  printf "%s" "$items" | bw_get_item "$uuid"
 
 }
 
@@ -1006,11 +1004,12 @@ bw_json_edit() {
   if (( $#narg )); then
     item=$(bw_template)
     if (( $#simplifyarg )); then
-      item=$(printf "%s" "$item" | jq -ceM "[.]" | bw_simplify | jq '.[]')
+      item=$(printf "%s" "$item" | jq -ceM "[.]" | bw_simplify)
     fi
   else
     item=$(bw_json "$@" "${simplifyarg[@]}")
   fi
+  item=$(printf "%s" "$item" | jq -M)
   local itemfile=$(printf "%s" "$item" | bw_init_file)
   bw_edit_file "$itemfile"
   if [[ $? -ne 0 ]]; then
