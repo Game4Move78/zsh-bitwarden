@@ -336,6 +336,17 @@ bw_unlock() {
   fi
 }
 
+bw_template() {
+  if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE/template.json" ]] && cat "$ZSH_BW_CACHE/template.json" ; then
+    return
+  fi
+  local template=$(bw get template item)
+  if [[ -n "$ZSH_BW_CACHE" ]]; then
+    printf "%s" "$template" > "$ZSH_BW_CACHE/template.json"
+  fi
+  printf "%s" "$template"
+}
+
 bw_unlock_read() {
   if [[ -n "$ZSH_BW_CACHE" ]] && [[ -e "$ZSH_BW_CACHE/bw-session.gpg" ]] && BW_SESSION=$(gpg --quiet --decrypt "$ZSH_BW_CACHE/bw-session.gpg" 2> /dev/null); then
     export BW_SESSION="$BW_SESSION"
@@ -390,8 +401,13 @@ bw_unsimplify() {
   }
   }')
   local uuid=$(printf "%s" "$item" | jq -rceM ".id")
-  local old_item=$(bw_list_cache | bw_get_item "$uuid")
-  printf "%s" "$old_item $new_item" | jq -ceMs "add"
+  local old_item
+  if [[ "$uuid" -eq "null" ]]; then
+    old_item=$(bw_template)
+  else
+    old_item=$(bw_list_cache | bw_get_item "$uuid")
+  fi
+  printf "%s" "$old_item $item" | jq -ceMs ".[0] * .[1]"
 }
 
 bw_list() {
@@ -767,7 +783,12 @@ bw_get_item() {
 bw_edit_json() {
   local item=$(</dev/stdin)
   local uuid=$(printf "%s" "$item" | jq -rceM ".id")
-  printf "%s" "$item" | bw encode | bw edit item "$uuid"
+  local code=$(printf "%s" "$item" | bw encode)
+  if [[ "$uuid" -eq "null" ]]; then
+    printf "%s" "$code" | bw create item
+  else
+    printf "%s" "$code" | bw edit item "$uuid"
+  fi
 }
 
 bw_edit_item() {
@@ -1019,7 +1040,7 @@ bw_create_login() {
   fi
   val=$(printf "%s" "$val" | bw_escape_jq)
   bw_reset_cache_list
-  bw get template item \
+  bw_template \
     | jq -ceM ".name=\"${name}\" | .login.username=\"$username\" | .login.password=\"$pass\"" \
     | bw encode | bw create item | jq -rceM '.login.password'
 }
@@ -1049,7 +1070,7 @@ bw_create_note() {
   fi
   val=$(printf "%s" "$val" | bw_escape_jq)
   bw_reset_cache_list
-  uuid=$(bw get template item \
+  uuid=$(bw_template \
            | jq ".name=\"${name}\" | .notes=\"${val}\" | .type=2 | .secureNote.type = 0" \
            | bw encode | bw create item | jq -r '.id')
 }
@@ -1076,11 +1097,21 @@ bw_json_edit() {
   if ! bw_unlock_read; then
     return 1
   fi
-  local -a simplifyarg
+  local -a simplifyarg narg
   zparseopts -D -K -E -- \
+             {n,-new}=narg \
              -simplify=simplifyarg || return
 
-  local item=$(bw_json "$@" "${simplifyarg[@]}")
+  local item
+
+  if (( $#narg )); then
+    item=$(bw_template)
+    if (( $#simplifyarg )); then
+      item=$(printf "%s" "$item" | jq -ceM "[.]" | bw_simplify | jq '.[]')
+    fi
+  else
+    item=$(bw_json "$@" "${simplifyarg[@]}")
+  fi
   local itemfile=$(mktemp -p "$BW_JSON_DIRECTORY")
   chmod 600 "$itemfile"
   printf "%s" "$item" > "$itemfile"
@@ -1099,7 +1130,7 @@ alias bwjse='bw_json_edit'
 alias bwls='bw_list'
 alias bwtsv='bw_tsv'
 alias bwul='bw_unlock'
-alias bwn='bw_tsv -o .name -c .login.username'
+alias bwn='bw_tsv -o .name'
 alias bwus='bw_tsv -c .name -o .login.username'
 alias bwpw='bw_tsv -c .name -c .login.username -O .login.password'
 alias bwno='bw_tsv -c .name -o .notes'
