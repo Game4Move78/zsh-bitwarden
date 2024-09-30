@@ -260,12 +260,9 @@ bw_search() {
   local -a carg=("$@")
   local curr next
 
-  # debug_array "/tmp/carg_before" "$carg[@]"
-
   while (( i <= $#carg )); do
     #TODO: Ordered header arguments
     curr="${carg[$i]}"
-    # debug_array "/tmp/curr_$i" "$curr"
     if [[ "$curr" == ("-h"|"-o"|"-c"|"-O") && $#carg -gt $i ]]; then
       next="${carg[(($i + 1))]}"
       if [[ "$curr" == "-h" ]]; then
@@ -287,40 +284,7 @@ bw_search() {
       header_args+=("-h" "${queue[1]}")
       queue=("${queue[@]:1}")
     fi
-    # debug_array "/tmp/carg_$i" "$curr" "$next" "$carg[@]"
-    # debug_array "/tmp/header_args_$i" "$curr" "$next" "$header_args[@]"
-    # debug_array "/tmp/jqpaths_$i" "$curr" "$next" "$jqpaths[@]"
   done
-
-  # debug_array "/tmp/colopts" "$colopts[@]"
-  # debug_array "/tmp/jqpaths" "$jqpaths[@]"
-  # debug_array "/tmp/header_args" "$header_args[@]"
-  # return
-
-  # for (( i = 1; i <= $#carg; i+=2)); do
-  #   #TODO: Ordered header arguments
-  #   debug_array "/tmp/carg_$i" "$carg[@]"
-  #   debug_array "/tmp/jqpaths_$i" "$jqpaths[@]"
-  #   debug_array "/tmp/queue_$i" "$queue[@]"
-  #   if [[ "$carg[$i]" == "-h" ]]; then
-  #     queue+=("${carg[(($i + 1))]}")
-  #     continue
-  #   elif [[ "$#queue" -eq 0 ]]; then
-  #     header_args+=("-h" "${carg[(($i + 1))]}")
-  #   else
-  #     header_args+=("-h" "${queue[1]}")
-  #     queue=("${queue[@]:1}")
-  #   fi
-  #   colopts+=("${${carg[$i]}[-1]}")
-  #   jqpaths+=("${carg[(($i + 1))]}")
-  # done
-
-
-  # for header in "$queue[@]"; do
-  #   header_args+=("-h" "$header")
-  # done
-
-  # jqpaths+=("$@")
 
   while [ ${#colopts} -lt $#jqpaths ]; do
     colopts+=("o")
@@ -422,7 +386,7 @@ bw_search() {
   local comma_out=$(IFS=, ; echo "${out[*]}")
 
   if (( $#jsonoutarg )); then
-    printf "%s" "$items" | jq -ceM ".[$row]"
+    printf "%s" "$items" | jq -ceM ".[$((row - 2))]"
   else
     printf "%s" "$row" | cut -f"$comma_out" | sed -z '$ s/\n$//'
   fi
