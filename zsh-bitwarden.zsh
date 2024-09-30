@@ -201,6 +201,15 @@ _bw_select() {
 
   # Output the corresponding row from the original tsv
   printf "%s" "$tsv" | sed -n "${row}p"
+
+  #TODO print row instead
+}
+
+debug_array() {
+  printf "" > "$1"
+  for arg in "${@:2}"; do
+    printf "%s\n" "$arg" >> "$1"
+  done
 }
 
 bw_search() {
@@ -209,9 +218,10 @@ bw_search() {
   zparseopts -D -K -E -- \
              -nout:=noutarg \
              -nskip:=nskiparg \
-             {h,-headers}+:=harg \
-             {H,-rev-headers}+:=Harg \
-             {o,c,O}+:=carg || return
+             || return
+             # {h,o,c,O}+:=carg || return
+  # {h,-headers}+:=harg \
+    # {H,-rev-headers}+:=Harg \
 
   # local -a POSITIONAL_ARGS=()
   # while [[ $# -gt 0 ]]; do
@@ -234,13 +244,73 @@ bw_search() {
 
   # set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
-  local -a jqpaths colopts
+  local -a jqpaths colopts queue header_args
 
-  for (( i = 1; i <= $#carg; i+=2)); do
-    colopts+=("${${carg[$i]}[-1]}")
-    jqpaths+=("${carg[(($i + 1))]}")
+  local i=1
+  local -a carg=("$@")
+  local curr next
+
+  # debug_array "/tmp/carg_before" "$carg[@]"
+
+  while (( i <= $#carg )); do
+    #TODO: Ordered header arguments
+    curr="${carg[$i]}"
+    # debug_array "/tmp/curr_$i" "$curr"
+    if [[ "$curr" == ("-h"|"-o"|"-c"|"-O") && $#carg -gt $i ]]; then
+      next="${carg[(($i + 1))]}"
+      if [[ "$curr" == "-h" ]]; then
+        queue+=("$next")
+      else
+        colopts+=("${curr[-1]}")
+        jqpaths+=("$next")
+      fi
+      i=$(( i + 2 ))
+    else
+      next="$curr"
+      jqpaths+=("$next")
+      i=$(( i + 1 ))
+    fi
+    if [[ "$#queue" -eq 0 ]]; then
+      next=$(bw_default_header "$next")
+      header_args+=("-h" "$next")
+    else
+      header_args+=("-h" "${queue[1]}")
+      queue=("${queue[@]:1}")
+    fi
+    # debug_array "/tmp/carg_$i" "$curr" "$next" "$carg[@]"
+    # debug_array "/tmp/header_args_$i" "$curr" "$next" "$header_args[@]"
+    # debug_array "/tmp/jqpaths_$i" "$curr" "$next" "$jqpaths[@]"
   done
-  jqpaths+=("$@")
+
+  # debug_array "/tmp/colopts" "$colopts[@]"
+  # debug_array "/tmp/jqpaths" "$jqpaths[@]"
+  # debug_array "/tmp/header_args" "$header_args[@]"
+  # return
+
+  # for (( i = 1; i <= $#carg; i+=2)); do
+  #   #TODO: Ordered header arguments
+  #   debug_array "/tmp/carg_$i" "$carg[@]"
+  #   debug_array "/tmp/jqpaths_$i" "$jqpaths[@]"
+  #   debug_array "/tmp/queue_$i" "$queue[@]"
+  #   if [[ "$carg[$i]" == "-h" ]]; then
+  #     queue+=("${carg[(($i + 1))]}")
+  #     continue
+  #   elif [[ "$#queue" -eq 0 ]]; then
+  #     header_args+=("-h" "${carg[(($i + 1))]}")
+  #   else
+  #     header_args+=("-h" "${queue[1]}")
+  #     queue=("${queue[@]:1}")
+  #   fi
+  #   colopts+=("${${carg[$i]}[-1]}")
+  #   jqpaths+=("${carg[(($i + 1))]}")
+  # done
+
+
+  # for header in "$queue[@]"; do
+  #   header_args+=("-h" "$header")
+  # done
+
+  # jqpaths+=("$@")
 
   while [ ${#colopts} -lt $#jqpaths ]; do
     colopts+=("o")
@@ -265,6 +335,7 @@ bw_search() {
     echo "Error: The number of column options (${#colopts}) does not match the number of JQ paths (${#jqpaths})." >&2
     return 1
   fi
+
 
   # Process the column options
   for ((i = 1; i <= ${#colopts}; i++)); do
@@ -315,8 +386,9 @@ bw_search() {
   fi
 
   local -a bw_table_args
-  (( $#harg )) && bw_table_args+=("${harg[@]}")
-  (( $#Harg )) && bw_table_args+=("${Harg[@]}")
+  # (( $#harg )) && bw_table_args+=("${harg[@]}")
+  # (( $#Harg )) && bw_table_args+=("${Harg[@]}")
+  bw_table_args+=("${header_args[@]}")
   (( $#nskiparg )) && bw_table_args+=("${nskiparg[@]}")
   bw_table_args+=("${jqpaths[@]}")
 
@@ -361,7 +433,7 @@ bw_request() {
     data_args+=("-d" "$(</dev/stdin)")
   fi
 
-  # local res=$(wget --method="$method" --header="accept: application/json" --header="Content-Type: application/json" --body-data="${data_args[@]}" -qO- "http://localhost:8087$endpoint") || return $?
+  # local res=$(wget --method="$method" --header="accept: application/json" --header="Content-Type: application/json" --body-data="${data_args[@]}" -qO- "http://localhost:8087$endpoint$params") || return $?
   echo "http://localhost:8087$endpoint$params" > /tmp/debug
   res=$(curl -sX "$method" "http://localhost:8087$endpoint$params" -H 'accept: application/json' -H 'Content-Type: application/json' "${data_args[@]}") || return $?
 
@@ -602,8 +674,6 @@ bw_tsv() {
         simplifyarg \
         larg \
         narg \
-        harg \
-        Harg \
         rarg \
         parg \
         carg \
@@ -619,11 +689,8 @@ bw_tsv() {
              -simplify=simplifyarg \
              {l,-login}=larg \
              {n,-note}=narg \
-             {h,-headers}+:=harg \
-             {H,-rev-headers}+:=Harg \
              {r,-raw}=rarg \
              {p,-clipboard}=parg \
-             {o,c,O}+:=carg \
              {t,-table}=targ || return
 
   if (( !$#parg )) && { (( $#targ )) || ! [[ -t 1 ]]; }; then
@@ -633,8 +700,6 @@ bw_tsv() {
   local res
 
   local -a bw_table_args
-  (( $#harg )) && bw_table_args+=("${harg[@]}")
-  (( $#Harg )) && bw_table_args+=("${Harg[@]}")
   (( $#nskiparg )) && bw_table_args+=("${nskiparg[@]}")
 
   local items
@@ -661,7 +726,6 @@ bw_tsv() {
   else
     local -a bw_search_args
     (( $#noutarg )) && bw_search_args+=("${noutarg[@]}")
-    (( $#carg )) && bw_search_args+=("${carg[@]}")
     IFS='' res=$(printf "%s" "$items" | bw_search "${bw_table_args[@]}" "${bw_search_args[@]}" "$@") || return $?
   fi
   if (( $#rarg )); then
@@ -762,7 +826,7 @@ bw_field() {
     fi
     uuid=$(printf "%s" "$items" | bw_tsv \
                                    --nout 1 \
-                                   --nskip 2 \
+                                   # --nskip 2 \
                                    -O .id \
                                    -c .name \
                                    -h "$name" -c ".fields[\"$name\"] | select(length > 0) | join(\", \")" "$@") || return $?
@@ -770,7 +834,7 @@ bw_field() {
   else
     uuid=$(printf "%s" "$items" | bw_tsv \
                                    --nout 1 \
-                                   --nskip 2 \
+                                   # --nskip 2 \
                                    -O '.id' \
                                    -c .name \
                                    -h fields -c ".fields | keys_unsorted | select(length > 0) | join(\", \")" "$@" \
@@ -849,7 +913,7 @@ bw_edit_field() {
   res=$(printf "%s" "$grp_items" | bw_search \
                                      -O .id -O "$path_idx" \
                                      -o .name \
-                                     -H "$name" -o "$path_val" \
+                                     -h "$name" -o "$path_val" \
                                      ) || return $?
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find field $name with search args $@" >&2
@@ -896,7 +960,7 @@ bw_add_field() {
   local path_val="[(.fields[] | select(.name == \"$name\") | .value) // \"\"] | first"
   res=$(printf "%s" "$items" | bw_search \
                                  -O .id -c .name \
-                                 -H "$name" -o "$path_val") || return $?
+                                 -h "$name" -o "$path_val") || return $?
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search args $@" >&2
     return 1

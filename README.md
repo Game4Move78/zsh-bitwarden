@@ -70,14 +70,14 @@ This command searches for "gmail" (`-s gmail`) and returns matching logins (`-l`
 ```zsh
 local fieldname="email"
 local fieldpath=".fields[\"$fieldname\"][0]"
-bwtsv --simplify -ls wikipedia -c .name -c .username -H "$fieldname" -o "$fieldpath"
+bwtsv --simplify -ls wikipedia -c .name -c .username -h "$fieldname" -o "$fieldpath"
 ```
 By using the JQ path `$fieldpath` that selects the field named "email", this example lets you copy one of the emails associated with the search string `wikipedia`. Any item not containing this field will not be displayed.
 
 ```zsh
 local fieldname="email"
 local fieldpath=".fields[\"$fieldname\"] | select(length > 0) | join(\", \")"
-bwtsv --simplify -pls wikipedia -c .name -c .username -H "$fieldname" -o "$fieldpath" | bw_tsv -h "$fieldname" -o '.'
+bwtsv --simplify -pls wikipedia -c .name -c .username -h "$fieldname" -o "$fieldpath" | bw_tsv -h "$fieldname" -o '.'
 ```
 
 Equivalent code but using piped bw_tsv to select from duplicates.
@@ -85,7 +85,7 @@ Equivalent code but using piped bw_tsv to select from duplicates.
 ### TSV Table
 
 ```zsh
-bwtsv --simplify -tls wikipedia .name .username -H 'num fields' '.fields | keys | length'
+bwtsv --simplify -tls wikipedia .name .username -h 'num fields' '.fields | keys | length'
 ```
 
 When using `-t`, instead of fzf selection, `bwtsv` displays all results in a TSV table.
