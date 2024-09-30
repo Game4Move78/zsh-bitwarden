@@ -362,6 +362,7 @@ bw_request() {
   fi
 
   # local res=$(wget --method="$method" --header="accept: application/json" --header="Content-Type: application/json" --body-data="${data_args[@]}" -qO- "http://localhost:8087$endpoint") || return $?
+  echo "http://localhost:8087$endpoint$params" > /tmp/debug
   res=$(curl -sX "$method" "http://localhost:8087$endpoint$params" -H 'accept: application/json' -H 'Content-Type: application/json' "${data_args[@]}") || return $?
 
   if ! printf "%s" "$res" | jq empty > /dev/null 2>&1; then
@@ -1114,6 +1115,7 @@ bw_json() {
 
   bw_unlock || return $?
 
+  local items uuid
   items=$(bw_tsv -p --items-only "$@") || return $?
 
   uuid=$(printf "%s" "$items" | bw_tsv --nout 1 -r -p -O '.id' -c .name "$@") || return $?
