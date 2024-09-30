@@ -80,11 +80,12 @@ bw_default_header() {
 # Takes JSON as stdin and jq paths to extract into tsv as args
 bw_table() {
 
-  local -a harg rharg
+  local -a nskiparg harg Harg
 
   zparseopts -D -K -E -- \
+             -nskip:=nskiparg \
              {h,-headers}+:=harg \
-             {H,-rev-headers}+:=rharg \
+             {H,-rev-headers}+:=Harg \
     || return
 
   if [[ "$#" == 0 ]]; then
@@ -94,13 +95,23 @@ bw_table() {
 
   local headers=()
 
+  local nskip=0
+  if (( $#nskiparg )); then
+    nskip="${nskiparg[-1]}"
+  fi
+
   for (( i = 1; i <= $#; i++)); do
     local header=""
-    if [ "$#harg" -ge "$(( i * 2 ))" ]; then
-      header="${harg[$(( i * 2 ))]}"
-    elif [ "1" -le "$(( (i - $#) * 2 + $#rharg ))" ]; then
-      header="${rharg[$(( (i - $#) * 2 + $#rharg ))]}"
+    if [[ "$i" -le "$nskip" ]]; then
+      header=$(bw_default_header "${(P)i}")
+    elif [[   "$#harg" -ge "$(( (i - nskip) * 2 ))" ]]; then
+      header="${harg[$(( (i - nskip) * 2 ))]}"
+    elif [[ "1" -le "$(( (i + nskip - $#) * 2 + $#Harg ))" ]]; then
+      header="${Harg[$(( (i + nskip - $#) * 2 + $#Harg ))]}"
     else
+      header=$(bw_default_header "${(P)i}")
+    fi
+    if [[ "$header" == $'\t' ]]; then
       header=$(bw_default_header "${(P)i}")
     fi
     headers+=("$header")
@@ -193,10 +204,13 @@ _bw_select() {
 }
 
 bw_search() {
-  local -a carg harg # oarg Oarg
+  local -a noutarg nskiparg harg Harg carg
 
   zparseopts -D -K -E -- \
+             -nout:=noutarg \
+             -nskip:=nskiparg \
              {h,-headers}+:=harg \
+             {H,-rev-headers}+:=Harg \
              {o,c,O}+:=carg || return
 
   # local -a POSITIONAL_ARGS=()
@@ -273,6 +287,10 @@ bw_search() {
     esac
   done
 
+  if (( $#noutarg )); then
+    out=("${out[1,${noutarg[-1]}]}")
+  fi
+
   # Ensure there are visible and output fields
   if [[ "${#visible}" == 0 ]]; then
       echo "No visible fields entered" >&2
@@ -296,7 +314,13 @@ bw_search() {
     return 4
   fi
 
-  tsv=$(printf "%s" "$items" | bw_table "${harg[@]}" "${jqpaths[@]}")
+  local -a bw_table_args
+  (( $#harg )) && bw_table_args+=("${harg[@]}")
+  (( $#Harg )) && bw_table_args+=("${Harg[@]}")
+  (( $#nskiparg )) && bw_table_args+=("${nskiparg[@]}")
+  bw_table_args+=("${jqpaths[@]}")
+
+  tsv=$(printf "%s" "$items" | bw_table "${bw_table_args[@]}")
 
   if [ $? -ne 0 ]; then
     echo "Failed to construct tsv" >&2
@@ -316,15 +340,29 @@ bw_search() {
 
 }
 
+bw_request_params() {
+  if [[ $# -eq 0 ]]; then
+    return
+  fi
+
+  printf "?%s=%s" "$1" "$2"
+
+  local j
+  for (( i=3, j=4; i <= $#; i += 2, j += 2)); do
+    printf "&%s=%s" "${(P)i}" "${(P)j}"
+  done
+}
+
 bw_request() {
   local method=$1 endpoint=$2 res
   local -a data_args
+  local params=$(bw_request_params "${@:3}")
   if ! [[ -t 0 ]]; then
     data_args+=("-d" "$(</dev/stdin)")
   fi
 
   # local res=$(wget --method="$method" --header="accept: application/json" --header="Content-Type: application/json" --body-data="${data_args[@]}" -qO- "http://localhost:8087$endpoint") || return $?
-  res=$(curl -sX "$method" "http://localhost:8087$endpoint" -H 'accept: application/json' -H 'Content-Type: application/json' "${data_args[@]}") || return $?
+  res=$(curl -sX "$method" "http://localhost:8087$endpoint$params" -H 'accept: application/json' -H 'Content-Type: application/json' "${data_args[@]}") || return $?
 
   if ! printf "%s" "$res" | jq empty > /dev/null 2>&1; then
     printf "%s\n" "$res" >&2
@@ -344,45 +382,26 @@ bw_request() {
   printf "%s" "$res"
 }
 
-bw_request_params() {
-  if [[ $# -eq 0 ]]; then
-    return
+bw_request_path() {
+  local -a rarg narg
+
+  zparseopts -D -K -E -- \
+             r=rarg \
+             n=narg || return
+
+  local method="$1" endpoint="$2" jqpath="$3" res exitcode
+  local params_list=("${@:4}")
+  res=$(bw_request "$method" "$endpoint" "${params_list[@]}"| jq "${rarg[@]}" -ceM "$jqpath")
+  _bw_pipefail ${pipestatus[@]} || return $?
+  printf "%s" "$res"
+  if (( !$#narg )); then
+    echo
   fi
-
-  printf "?%s=%s" "$1" "$2"
-
-  local j
-  for (( i=3, j=4; i <= $#; i += 2, j += 2)); do
-    printf "&%s=%s" "${(P)i}" "${(P)j}"
-  done
-}
-
-bw_generate() {
-  local -a larg uarg sarg narg lengtharg
-  zparseopts -D -F -K -- \
-             {l,-lowercase}=larg \
-             {u,-uppercase}=uarg \
-             {s,-special}=sarg \
-             {n,-number}=narg \
-             -length:=lengtharg || return
-
-  local -a param_list
-  (( $#larg)) && param_list+=( "lowercase" "true" )
-  (( $#uarg)) && param_list+=( "uppercase" "true" )
-  (( $#sarg)) && param_list+=( "special" "true" )
-  (( $#narg)) && param_list+=( "number" "true" )
-  (( $#lengtharg)) && param_list+=( "length" "${lengtharg[-1]}" )
-
-  local params=$(bw_request_params "${param_list[@]}")
-
-  bw_request_path GET "/generate$params" .data
 }
 
 bw_status() {
   local res
-  res=$(bw_request GET '/status' | jq -rceM '.template.status')
-  _bw_pipefail ${pipestatus[@]} || return $?
-  # res=$(bw_request_path GET /status .template.status)
+  res=$(bw_request_path -rn GET '/status' '.template.status') || return $?
   printf "%s\n" "$res" >&2
   if [[ "$res" == "unlocked" ]]; then
     return 0
@@ -419,13 +438,8 @@ bw_unlock() {
 
   local res exitcode
 
-  res=$(printf "%s" "$pass" | awk '{print "{\"password\":\"" $0 "\"}"}' | bw_request POST /unlock)
-  _bw_pipefail ${pipestatus[@]}
-  exitcode=$?
+  printf "%s" "$pass" | awk '{print "{\"password\":\"" $0 "\"}"}' | bw_request_path -r POST /unlock .title >&2
 
-  printf "%s" "$res" | jq -rceM .title >&2
-
-  return exitcode
 }
 
 bw_lock() {
@@ -437,13 +451,33 @@ bw_lock() {
     return
   fi
 
-  res=$(bw_request POST /lock) || return $?
+  bw_request_path -r POST /lock .title
 
-  printf "%s" "$res" | jq -rceM .title
+}
+
+bw_generate() {
+  local -a larg uarg sarg narg lengtharg
+  zparseopts -D -F -K -- \
+             {l,-lowercase}=larg \
+             {u,-uppercase}=uarg \
+             {s,-special}=sarg \
+             {n,-number}=narg \
+             -length:=lengtharg || return
+
+  bw_unlock || return $?
+
+  local -a param_list
+  (( $#larg)) && param_list+=( "lowercase" "true" )
+  (( $#uarg)) && param_list+=( "uppercase" "true" )
+  (( $#sarg)) && param_list+=( "special" "true" )
+  (( $#narg)) && param_list+=( "number" "true" )
+  (( $#lengtharg)) && param_list+=( "length" "${lengtharg[-1]}" )
+
+  bw_request_path -rn GET "/generate$params" .data "${param_list[@]}"
 }
 
 bw_template() {
-  bw_request GET /object/template/item | jq -ceM ".template"
+  bw_request_path -n GET /object/template/item .template
 }
 
 bw_list_cache() {
@@ -451,8 +485,7 @@ bw_list_cache() {
   bw_unlock || return $?
 
   local res
-  res=$(bw_request GET /list/object/items) || return $?
-  printf "%s" "$res" | jq -ceM '.data'
+  bw_request_path -n GET /list/object/items .data
 
 }
 
@@ -558,6 +591,9 @@ bw_copy() {
 
 bw_tsv() {
   local -a \
+        nskiparg \
+        noutarg \
+        itemsonlyarg \
         sarg \
         sxarg \
         jarg \
@@ -566,11 +602,15 @@ bw_tsv() {
         larg \
         narg \
         harg \
+        Harg \
         rarg \
         parg \
         carg \
         targ
   zparseopts -D -K -E -- \
+             -nskip:=nskiparg \
+             -nout:=noutarg \
+             -items-only=itemsonlyarg \
              {s,-search-all}+:=sarg \
              {-search-name,-search-user,-search-pass,-search-note}+:=sxarg \
              {j,-search-jq}:=jarg \
@@ -579,6 +619,7 @@ bw_tsv() {
              {l,-login}=larg \
              {n,-note}=narg \
              {h,-headers}+:=harg \
+             {H,-rev-headers}+:=Harg \
              {r,-raw}=rarg \
              {p,-clipboard}=parg \
              {o,c,O}+:=carg \
@@ -592,6 +633,8 @@ bw_tsv() {
 
   local -a bw_table_args
   (( $#harg )) && bw_table_args+=("${harg[@]}")
+  (( $#Harg )) && bw_table_args+=("${Harg[@]}")
+  (( $#nskiparg )) && bw_table_args+=("${nskiparg[@]}")
 
   local items
   if [[ -t 0 ]]; then
@@ -604,6 +647,10 @@ bw_tsv() {
     (( $#larg )) && bw_list_args+=("${larg[@]}")
     (( $#narg )) && bw_list_args+=("${narg[@]}")
     items=$(bw_list "${bw_list_args[@]}")
+    if (( $#itemsonlyarg )); then
+      printf "%s" "$items"
+      return
+    fi
   else
     items=$(</dev/stdin)
   fi
@@ -612,6 +659,7 @@ bw_tsv() {
     IFS='' res=$(printf "%s" "$items" | bw_table "${bw_table_args[@]}" "$@") || return $?
   else
     local -a bw_search_args
+    (( $#noutarg )) && bw_search_args+=("${noutarg[@]}")
     (( $#carg )) && bw_search_args+=("${carg[@]}")
     IFS='' res=$(printf "%s" "$items" | bw_search "${bw_table_args[@]}" "${bw_search_args[@]}" "$@") || return $?
   fi
@@ -698,7 +746,7 @@ bw_field() {
 
 
   local items
-  items=$(bw_list --simplify "$@") || return $?
+  items=$(bw_tsv -p --items-only  --simplify "$@") || return $?
 
   local res
   local item
@@ -711,16 +759,20 @@ bw_field() {
     elif (( $#choosearg)); then
       name=$(printf "%s" "$items" | bw_select_values '.fields | keys_unsorted | .[]' "field") || return $?
     fi
-    uuid=$(printf "%s" "$items" | bw_search \
+    uuid=$(printf "%s" "$items" | bw_tsv \
+                                   --nout 1 \
+                                   --nskip 2 \
                                    -O .id \
                                    -c .name \
-                                   -H "$name" -c ".fields[\"$name\"] | select(length > 0) | join(\", \")") || return $?
+                                   -h "$name" -c ".fields[\"$name\"] | select(length > 0) | join(\", \")" "$@") || return $?
     item=$(printf "%s" "$items" | bw_get_item "$uuid") || return $?
   else
-    uuid=$(printf "%s" "$items" | bw_search \
+    uuid=$(printf "%s" "$items" | bw_tsv \
+                                   --nout 1 \
+                                   --nskip 2 \
                                    -O '.id' \
                                    -c .name \
-                                   -H fields -c ".fields | keys_unsorted | select(length > 0) | join(\", \")" \
+                                   -h fields -c ".fields | keys_unsorted | select(length > 0) | join(\", \")" "$@" \
                                    ) || return $?
     item=$(printf "%s" "$items" | bw_get_item "$uuid")
     name=$(printf "%s" "$item" | jq -ceM ".fields | to_entries" | bw_search \
@@ -1062,9 +1114,9 @@ bw_json() {
 
   bw_unlock || return $?
 
-  items=$(bw_list "$@") || return $?
+  items=$(bw_tsv -p --items-only "$@") || return $?
 
-  uuid=$(printf "%s" "$items" | bw_tsv -r -p -O '.id' -c .name) || return $?
+  uuid=$(printf "%s" "$items" | bw_tsv --nout 1 -r -p -O '.id' -c .name "$@") || return $?
 
   printf "%s" "$items" | bw_get_item "$uuid"
 
@@ -1120,14 +1172,6 @@ bw_json_edit() {
   # bw_reset_cache_list
 }
 
-bw_request_path() {
-  bw_unlock || return $?
-  local method=$1 endpoint=$2 jqpath=$3 res exitcode
-  res=$(bw_request "$method" "$endpoint" | jq -rceM "$jqpath")
-  _bw_pipefail ${pipestatus[@]} || return $?
-  printf "%s\n" "$res"
-}
-
 alias bwjs='bw_json'
 alias bwjse='bw_json_edit'
 alias bwls='bw_list'
@@ -1136,9 +1180,9 @@ alias bwst='bw_status'
 alias bwul='bw_unlock'
 alias bwlk='bw_lock'
 alias bwn='bw_tsv -o .name'
-alias bwus='bw_tsv -c .name -o .login.username'
-alias bwpw='bw_tsv -c .name -c .login.username -O .login.password'
-alias bwno='bw_tsv -c .name -o .notes'
+alias bwus='bw_tsv --nout 1 -c .name -o .login.username'
+alias bwpw='bw_tsv --nout 1 -c .name -c .login.username -O .login.password'
+alias bwno='bw_tsv --nout -c .name -o .notes'
 alias bwfl='bw_field'
 alias bwup='bw_user_pass'
 alias bwne='bw_edit_name'
