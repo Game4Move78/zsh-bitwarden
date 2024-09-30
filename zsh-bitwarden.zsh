@@ -886,17 +886,17 @@ bw_add_field() {
 
   bw_unlock || return $?
 
-  local items=$(bw_list "$@")
-  local name val
+  local items name res val
+  items=$(bw_list "$@") || return $?
   if (( $#farg)); then
     name="${farg[-1]}"
   else
-    name=$(printf "%s" "$items" | bw_select_field)
+    name=$(printf "%s" "$items" | bw_select_field) || return $?
   fi
   local path_val="[(.fields[] | select(.name == \"$name\") | .value) // \"\"] | first"
-  local res=$(printf "%s" "$items" | bw_search \
-                                       -O .id -c .name \
-                                       -H "$name" -o "$path_val")
+  res=$(printf "%s" "$items" | bw_search \
+                                 -O .id -c .name \
+                                 -H "$name" -o "$path_val") || return $?
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search args $@" >&2
     return 1
@@ -915,12 +915,12 @@ bw_edit_name() {
 
   bw_unlock || return $?
 
-  local items=$(bw_list "$@")
-  local uuid val res
+  local items uuid val res
+  items=$(bw_list -l "$@") || return $?
   res=$(printf "%s" "$items" | bw_search \
                                  -o .name \
                                  -c .login.username \
-                                 -O .id)
+                                 -O .id) || return $?
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search strings $@" >&2
     return 1
@@ -957,12 +957,12 @@ bw_edit_username() {
 
   bw_unlock || return $?
 
-  local items=$(bw_list -l "$@")
-  local uuid val res
+  local items uuid val res
+  items=$(bw_list -l "$@") || return $?
   res=$(printf "%s" "$items" | bw_search \
                                  -c .name \
                                  -o .login.username \
-                                 -O .id)
+                                 -O .id) || return $?
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search args $@" >&2
     return 1
@@ -983,12 +983,14 @@ bw_edit_password() {
 
   bw_unlock || return $?
 
-  local items=$(bw_list -l "$@")
-  local uuid val res
+  local items uuid val res
+
+  items=$(bw_list -l "$@") || return $?
+
   res=$(printf "%s" "$items" | bw_search \
                                  -c .name \
                                  -c .login.username \
-                                 -O .id -O .login.password)
+                                 -O .id -O .login.password) || return $?
   if [[ $? -ne 0 ]]; then
     echo "Couldn't find items with search args $@" >&2
     return 1
@@ -1020,11 +1022,13 @@ bw_edit_note() {
 
   bw_unlock || return $?
 
-  local items=$(bw_list -n "$@")
-  local uuid val res
+  local items uuid val res
+
+  items=$(bw_list -n "$@") || return $?
   res=$(printf "%s" "$items" | bw_search \
                                  -c .name \
-                                 -o .notes -O .id)
+                                 -o .notes -O .id) || return $?
+
   printf "%s" "$res" | IFS=$'\t' read -r uuid val
   if [[ -t 0 ]]; then
     val=$(printf "%s" "$val" | bw_raw_jq)
