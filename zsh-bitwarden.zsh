@@ -152,6 +152,12 @@ bw_table() {
 # Takes tsv as stdin and columns to show in fzf as args
 _bw_select() {
 
+  local -a rowoutarg
+
+  zparseopts -D -K -E -- \
+             -rowout=rowoutarg \
+    || return
+
   if [[ "$#" == 0 ]]; then
     echo "Usage: $0 [COLUMN INDEX]..."
     return 1
@@ -200,9 +206,12 @@ _bw_select() {
   fi
 
   # Output the corresponding row from the original tsv
-  printf "%s" "$tsv" | sed -n "${row}p"
+  if (( $#rowoutarg )); then
+    printf "%s" "$row"
+  else
+    printf "%s" "$tsv" | sed -n "${row}p"
+  fi
 
-  #TODO print row instead
 }
 
 debug_array() {
@@ -213,9 +222,10 @@ debug_array() {
 }
 
 bw_search() {
-  local -a noutarg nskiparg harg Harg carg
+  local -a jsonoutarg noutarg nskiparg harg Harg carg
 
   zparseopts -D -K -E -- \
+             -jsonout=jsonoutarg \
              -nout:=noutarg \
              -nskip:=nskiparg \
              || return
@@ -399,7 +409,10 @@ bw_search() {
     return 4
   fi
 
-  row=$(printf "%s" "$tsv" | _bw_select "${visible[@]}")
+  local -a bw_select_args
+  (( $#jsonoutarg )) && bw_select_args+=("--rowout")
+
+  row=$(printf "%s" "$tsv" | _bw_select "${bw_select_args[@]}" "${visible[@]}")
 
   if [ $? -ne 0 ]; then
     echo "Failed to select row" >&2
@@ -408,7 +421,11 @@ bw_search() {
 
   local comma_out=$(IFS=, ; echo "${out[*]}")
 
-  printf "%s" "$row" | cut -f"$comma_out" | sed -z '$ s/\n$//'
+  if (( $#jsonoutarg )); then
+    printf "%s" "$items" | jq -ceM ".[$row]"
+  else
+    printf "%s" "$row" | cut -f"$comma_out" | sed -z '$ s/\n$//'
+  fi
 
 }
 
@@ -664,6 +681,7 @@ bw_copy() {
 
 bw_tsv() {
   local -a \
+        jsonout \
         nskiparg \
         noutarg \
         itemsonlyarg \
@@ -679,6 +697,7 @@ bw_tsv() {
         carg \
         targ
   zparseopts -D -K -E -- \
+             -jsonout=jsonoutarg \
              -nskip:=nskiparg \
              -nout:=noutarg \
              -items-only=itemsonlyarg \
@@ -693,7 +712,7 @@ bw_tsv() {
              {p,-clipboard}=parg \
              {t,-table}=targ || return
 
-  if (( !$#parg )) && { (( $#targ )) || ! [[ -t 1 ]]; }; then
+  if (( !$#parg )) && { (( $#targ )) || ! [[ -t 1 ]] || (( $#jsonoutarg )); }; then
     parg+=("-p")
   fi
 
@@ -725,6 +744,7 @@ bw_tsv() {
     IFS='' res=$(printf "%s" "$items" | bw_table "${bw_table_args[@]}" "$@") || return $?
   else
     local -a bw_search_args
+    (( $#jsonoutarg )) && bw_search_args+=("${jsonoutarg[@]}")
     (( $#noutarg )) && bw_search_args+=("${noutarg[@]}")
     IFS='' res=$(printf "%s" "$items" | bw_search "${bw_table_args[@]}" "${bw_search_args[@]}" "$@") || return $?
   fi
@@ -1186,9 +1206,11 @@ bw_json() {
   local items uuid
   items=$(bw_tsv -p --items-only "$@") || return $?
 
-  uuid=$(printf "%s" "$items" | bw_tsv --nout 1 -r -p -O '.id' -c .name "$@") || return $?
+  bw_tsv --jsonout -p .name "$@"
 
-  printf "%s" "$items" | bw_get_item "$uuid"
+  # uuid=$(printf "%s" "$items" | bw_tsv --nout 1 -r -p -O '.id' -c .name "$@") || return $?
+
+  # printf "%s" "$items" | bw_get_item "$uuid"
 
 }
 
