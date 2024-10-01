@@ -685,7 +685,7 @@ bw_user_pass() {
   local res user pass
   local -a res
   IFS=$'\x1F' res=($(bw_list -l "$@" | bw_search -c .name -o .login.username -O .login.password))
-  user="${res[1]}" pass="{$res[2]}"
+  user="${res[1]}" pass="${res[2]}"
   _bw_pipefail ${pipestatus[@]}
 
   if [[ "$?" -ne 0 ]]; then
