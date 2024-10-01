@@ -283,6 +283,7 @@ bw_search() {
   fi
   if [[ "${#jqout}" == 0 ]]; then
     jqout=(".")
+    raw_queue+=(1)
     # echo "No output fields entered" >&2
     # return 2
   fi
