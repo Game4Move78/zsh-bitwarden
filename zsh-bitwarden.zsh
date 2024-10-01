@@ -130,7 +130,7 @@ bw_table() {
   # Construct tsv with values selected using args
   jq_output=$(
     printf "%s" "$json" \
-    | jq -rceM "to_entries | .[] | [.key] + [.value|($keys)] | select(all(.[]; . != null) and length == $width + 1) | @tsv" 2> /dev/null
+    | jq -rceM "to_entries | .[] | [.key] + [.value|($keys)] | select(all(.[]; . != null) and length == $width + 1) | map(tostring) | @tsv" 2> /dev/null
   ) || return $?
 
   if [[ -z "$jq_output" ]]; then
@@ -242,7 +242,7 @@ bw_search() {
       continue
     else
       next="$curr"
-      isout=1
+      isout=0
       istbl=1
     fi
     if (( isout )); then
@@ -282,8 +282,9 @@ bw_search() {
     return 1
   fi
   if [[ "${#jqout}" == 0 ]]; then
-    echo "No output fields entered" >&2
-    return 2
+    jqout=(".")
+    # echo "No output fields entered" >&2
+    # return 2
   fi
 
   # Search using bitwarden
