@@ -677,16 +677,28 @@ bw_tsv() {
 #   done
 # }
 
+bw_connect_wifi() {
+  bw_unlock || return $?
+  local -a res
+  local ssids jqfilter
+  ssids=$(nmcli device wifi list | grep -v 'SSID' | grep -v '|' | awk '{print $2}' | paste -sd'|')
+  items=$(bw_list -l "$@" | jq -ceM "[.[] | select((.login.username | test(\"^($ssids)\$\"))?)]")
+  IFS=$'\x1F' res=($(printf "%s" "$items" | bw_search -c .name -o .login.username -O .login.password))
+  _bw_pipefail ${pipestatus[@]} || return $?
+  user="${res[1]}" pass="${res[2]}"
+  printf "%s" "$pass" | nmcli --ask c up "$user"
+}
+
 bw_user_pass() {
   local -a sarg
 
   bw_unlock || return $?
 
-  local res user pass
+  local user pass
   local -a res
   IFS=$'\x1F' res=($(bw_list -l "$@" | bw_search -c .name -o .login.username -O .login.password))
-  user="${res[1]}" pass="${res[2]}"
   _bw_pipefail ${pipestatus[@]}
+  user="${res[1]}" pass="${res[2]}"
 
   if [[ "$?" -ne 0 ]]; then
     return 2
