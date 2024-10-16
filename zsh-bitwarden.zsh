@@ -1034,7 +1034,7 @@ bw_edit_password() {
     return 1
   fi
   # printf "%s" "$res" | bw_read_results item val uuid || return $?
-  item="${res[1]}" val="${res[2]}" uuid="${res[3]}"
+  item="${res[1]}" uuid="${res[2]}" val="${res[3]}"
   if [[ -t 0 ]]; then
     val=$(printf "%s" "$val" | bw_raw_jq)
     echo -n "Enter password: " >&2
