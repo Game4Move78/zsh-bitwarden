@@ -1271,8 +1271,6 @@ bw_path_candidates() {
 
   bw_unlock || return $?
 
-  echo "$@" > /tmp/test
-
   prefix="$1"
   jq_query='
   [
