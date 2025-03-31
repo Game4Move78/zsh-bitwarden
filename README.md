@@ -14,6 +14,7 @@ See [INSTALL.md](INSTALL.md).
 | `bwlk`     | lock the vault              |
 | `bwst`     | vault status                |
 | `bwsn`     | sync the vault              |
+| `bw_path`  | like `pass show`            |
 | `bwjs`     | print item json             |
 | `bwjse`    | edit item json in $EDITOR   |
 | `bwtsv -t` | print tsv table             |
