@@ -19,7 +19,6 @@ See [INSTALL.md](INSTALL.md).
 | `bwjse`    | edit item json in $EDITOR   |
 | `bwtsv -t` | print tsv table             |
 | `bwtsv`    | select tsv data             |
-| `bwtsv -t` | print tsv table             |
 | `bwg`      | alphanum + special password |
 | `bwgs`     | alphanum password           |
 | `bwus`     | get username                |
